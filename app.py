@@ -57,8 +57,11 @@ VERSICULOS_EMPRENDIMIENTO = [
     {"texto": "Porque Dios no nos ha dado un espíritu de timidez, sino de poder, de amor y de dominio propio.", "cita": "2 Timoteo 1:7"}
 ]
 
+LISTA_SERVICIOS = ["Belleza y Estética", "Diseño y Creatividad", "Consultoría y Asesoría", "Eventos y Fotografía", "Reparaciones y Confección", "Educación y Clases", "Otro Servicio"]
+LISTA_PRODUCTOS = ["Postres y Repostería", "Cuidado Personal y Cosmética", "Moda y Accesorios", "Decoración y Hogar", "Papelería y Agendas", "Artesanías y Manualidades", "Otro Producto"]
+
 # ---------------------------------------------------------
-# FUNCIONES PROCESAMIENTO DE IMÁGENES Y DATOS
+# FUNCIONES AUXILIARES Y MANEJO DE DATOS
 # ---------------------------------------------------------
 def cargar_imagen_segura(ruta):
     if os.path.exists(ruta):
@@ -134,45 +137,6 @@ def cargar_datos():
         df_i.to_csv(ARCHIVO_CSV, index=False)
         return df_i
 
-def cargar_chat():
-    if os.path.exists(ARCHIVO_CHAT):
-        try:
-            return pd.read_csv(ARCHIVO_CHAT)
-        except Exception:
-            df = pd.DataFrame(columns=["Hora", "Usuario", "Mensaje"])
-            df.to_csv(ARCHIVO_CHAT, index=False)
-            return df
-    else:
-        df = pd.DataFrame(columns=["Hora", "Usuario", "Mensaje"])
-        df.to_csv(ARCHIVO_CHAT, index=False)
-        return df
-
-def cargar_finanzas():
-    if os.path.exists(ARCHIVO_FINANZAS):
-        try:
-            return pd.read_csv(ARCHIVO_FINANZAS)
-        except Exception:
-            df = pd.DataFrame(columns=["Email_Emprendedora", "Fecha", "Tipo", "Concepto", "Monto"])
-            df.to_csv(ARCHIVO_FINANZAS, index=False)
-            return df
-    else:
-        df = pd.DataFrame(columns=["Email_Emprendedora", "Fecha", "Tipo", "Concepto", "Monto"])
-        df.to_csv(ARCHIVO_FINANZAS, index=False)
-        return df
-
-def cargar_clientes():
-    if os.path.exists(ARCHIVO_CLIENTES):
-        try:
-            return pd.read_csv(ARCHIVO_CLIENTES)
-        except Exception:
-            df = pd.DataFrame(columns=["Email_Emprendedora", "Nombre_Cliente", "Telefono", "Notas"])
-            df.to_csv(ARCHIVO_CLIENTES, index=False)
-            return df
-    else:
-        df = pd.DataFrame(columns=["Email_Emprendedora", "Nombre_Cliente", "Telefono", "Notas"])
-        df.to_csv(ARCHIVO_CLIENTES, index=False)
-        return df
-
 def cargar_productos():
     df_base_prods = pd.DataFrame([
         {"Email_Emprendedora": CORREO_ADMIN, "Producto": "Kit de Velas Artesanales", "Precio": 250.0, "Categoria": "Decoración y Hogar", "Estado": "Querétaro", "Stock": 10, "Estado_Aprobacion": "Aprobado"},
@@ -232,9 +196,6 @@ if "versiculo_dia" not in st.session_state:
 
 df_emprendedoras = cargar_datos()
 img_logo = cargar_imagen_segura(LOGO_IMAGEN)
-
-LISTA_SERVICIOS = ["Belleza y Estética", "Diseño y Creatividad", "Consultoría y Asesoría", "Eventos y Fotografía", "Reparaciones y Confección", "Educación y Clases", "Otro Servicio"]
-LISTA_PRODUCTOS = ["Postres y Repostería", "Cuidado Personal y Cosmética", "Moda y Accesorios", "Decoración y Hogar", "Papelería y Agendas", "Artesanías y Manualidades", "Otro Producto"]
 
 # ---------------------------------------------------------
 # 2. ESTILOS VISUALES
@@ -440,7 +401,6 @@ if not st.session_state["sesion_activa"]:
                         st.success("¡Registro completado!")
                         st.rerun()
 
-        # BOTÓN / FORMULARIO: REGISTRO EMPRENDEDORA GRATIS (Solo Directorio y Marketplace)
         with tab_reg_emp_gratis:
             st.markdown("<b style='color:#D81B60;'>🌸 Registro Gratuito para Emprendedoras (Directorio y Marketplace)</b>", unsafe_allow_html=True)
             tipo_oferta_g = st.radio("¿Qué ofrece tu negocio?", ["Servicios", "Productos"], horizontal=True, key="reg_g_tipo")
@@ -469,7 +429,7 @@ if not st.session_state["sesion_activa"]:
                 foto_g = st.file_uploader("Subir Foto de Perfil / Logo", type=["jpg", "png", "jpeg"], key="g_foto")
                 ine_g = st.file_uploader("Subir Foto de INE Oficial (Frente/Vuelta)", type=["jpg", "png", "pdf"], key="g_ine")
                 
-                btn_reg_g = st.form_submit_button("🌸 Unirme Gratis al Directorio y Marketplace")
+                btn_reg_g = st.form_submit_button("🌸 Enviar Registro Gratis para Revisión")
                 
                 if btn_reg_g and email_g and nombre_g and negocio_g and cel_g and curp_g_val:
                     if not df_emprendedoras[df_emprendedoras["Email"] == email_g].empty:
@@ -478,6 +438,7 @@ if not st.session_state["sesion_activa"]:
                         st.error("La CURP debe contener exactamente 18 caracteres.")
                     else:
                         foto_url_base64 = convertir_imagen_a_base64(foto_g)
+                        estado_registro = "Aprobado" if email_g == CORREO_ADMIN else "Pendiente"
                         lat, lon = COORDENADAS_ESTADOS.get(estado_g, (23.6345, -102.5528))
                         
                         nueva_row = pd.DataFrame([{
@@ -485,7 +446,7 @@ if not st.session_state["sesion_activa"]:
                             "Tipo_Oferta": tipo_oferta_g, "Categoria": categoria_sel_g, "Estado": estado_g,
                             "Ciudad": ciudad_g, "Colonia": colonia_g, "Contacto": contacto_g,
                             "Descripcion": desc_g, "Historia": historia_g, "Estado_Pago": "Emprendedora Gratis", "Metodo_Pago": "Gratis",
-                            "Estado_Aprobacion": "Aprobado",
+                            "Estado_Aprobacion": estado_registro,
                             "Foto_Perfil": foto_url_base64,
                             "INE_Doc": "Adjuntado" if ine_g else "Pendiente",
                             "CURP_Valor": curp_g_val,
@@ -498,10 +459,9 @@ if not st.session_state["sesion_activa"]:
                         st.session_state["email_logueado"] = email_g
                         st.session_state["usuario_logueado"] = nombre_g
                         st.session_state["rol_usuario"] = "Emprendedora Gratis"
-                        st.success("¡Registro Gratuito Completado! Ya eres parte del Directorio y Marketplace.")
+                        st.success("¡Registro enviado! Quedó en revisión para aprobación exclusiva de la Fundadora (Larissa García).")
                         st.rerun()
 
-        # FORMULARIO: REGISTRO EMPRENDEDORA VIP ($25 MXN)
         with tab_reg_emp_vip:
             st.markdown("<b style='color:#D81B60;'>💳 Registro Emprendedora VIP ($25 MXN/mes) — Acceso Completo</b>", unsafe_allow_html=True)
             tipo_oferta_v = st.radio("¿Qué ofrece tu negocio?", ["Servicios", "Productos"], horizontal=True, key="reg_v_tipo")
@@ -531,7 +491,7 @@ if not st.session_state["sesion_activa"]:
                 ine_v = st.file_uploader("Subir Identificación INE Oficial (Frente/Vuelta)", type=["jpg", "png", "pdf"], key="v_ine")
                 
                 metodo_v = st.selectbox("Método de Pago", ["Mercado Pago / Tarjeta", "Transferencia SPEI"])
-                btn_reg_v = st.form_submit_button("💳 Registrar Emprendimiento VIP y Acceder")
+                btn_reg_v = st.form_submit_button("💳 Registrar Emprendimiento VIP y Enviar a Revisión")
                 
                 if btn_reg_v and email_v and nombre_v and negocio_v and cel_v and curp_v_val:
                     if not df_emprendedoras[df_emprendedoras["Email"] == email_v].empty:
@@ -561,7 +521,7 @@ if not st.session_state["sesion_activa"]:
                         st.session_state["email_logueado"] = email_v
                         st.session_state["usuario_logueado"] = nombre_v
                         st.session_state["rol_usuario"] = "VIP"
-                        st.success("¡Registro VIP completado!")
+                        st.success("¡Registro VIP enviado! En espera de validación exclusiva por Larissa García.")
                         st.rerun()
 
 # ---------------------------------------------------------
@@ -612,7 +572,7 @@ else:
         ].copy()
         
         if df_servicios.empty:
-            st.info("Aún no hay emprendedoras registradas.")
+            st.info("Aún no hay emprendedoras aprobadas en el directorio.")
         else:
             for idx, row in df_servicios.reset_index().iterrows():
                 es_propietaria = (row.get('Email') == st.session_state["email_logueado"]) or st.session_state["es_admin"]
@@ -680,26 +640,89 @@ else:
                                 st.success("¡Perfil e historia actualizados con éxito!")
                                 st.rerun()
 
-    # --- PESTAÑA 2: MARKETPLACE DE PRODUCTOS ---
+    # --- PESTAÑA 2: MARKETPLACE DE PRODUCTOS (AGREGAR, EDITAR Y ELIMINAR) ---
     with pestañas[1]:
         st.markdown('<h3 class="brand-font" style="color:#D81B60;">🛍️ Marketplace Nacional Empoder-Arte</h3>', unsafe_allow_html=True)
         df_prods_todos = cargar_productos()
+        
+        # BOTÓN PARA PUBLICAR NUEVO PRODUCTO EN MARKETPLACE
+        if st.session_state["rol_usuario"] in ["VIP", "Emprendedora Gratis", "Admin", "Administradora"]:
+            with st.expander("➕ AGREGAR NUEVA PUBLICACIÓN AL MARKETPLACE"):
+                with st.form("form_nuevo_prod_market"):
+                    prod_nombre = st.text_input("Nombre del Producto")
+                    prod_precio = st.number_input("Precio ($ MXN)", min_value=1.0, value=100.0, step=10.0)
+                    prod_cat = st.selectbox("Categoría", LISTA_PRODUCTOS)
+                    prod_estado = st.selectbox("Estado de Envío / Ubicación", ESTADOS_MEXICO)
+                    prod_stock = st.number_input("Unidades en Stock", min_value=1, value=5, step=1)
+                    btn_crear_prod = st.form_submit_button("🚀 Enviar Publicación a Revisión")
+                    
+                    if btn_crear_prod and prod_nombre:
+                        estado_ap = "Aprobado" if st.session_state["es_admin"] else "Pendiente"
+                        nuevo_p_df = pd.DataFrame([{
+                            "Email_Emprendedora": st.session_state["email_logueado"],
+                            "Producto": prod_nombre,
+                            "Precio": float(prod_precio),
+                            "Categoria": prod_cat,
+                            "Estado": prod_estado,
+                            "Stock": int(prod_stock),
+                            "Estado_Aprobacion": estado_ap
+                        }])
+                        df_prods_todos = pd.concat([df_prods_todos, nuevo_p_df], ignore_index=True)
+                        guardar_datos(df_prods_todos, ARCHIVO_PRODUCTOS)
+                        if estado_ap == "Aprobado":
+                            st.success("¡Producto publicado en el Marketplace!")
+                        else:
+                            st.info("¡Producto registrado! Quedó en revisión para aprobación exclusiva de la Fundadora.")
+                        st.rerun()
+                        
+        st.write("---")
         df_prods = df_prods_todos[df_prods_todos["Estado_Aprobacion"] == "Aprobado"].copy()
 
         if df_prods.empty:
-            st.info("No hay productos disponibles.")
+            st.info("No hay productos aprobados disponibles por el momento.")
         else:
             cols = st.columns(3)
             for idx, row in df_prods.reset_index().iterrows():
+                es_autora_o_fundadora = (st.session_state["email_logueado"] == row["Email_Emprendedora"]) or (st.session_state["email_logueado"] == CORREO_ADMIN) or st.session_state["es_admin"]
+                
                 with cols[idx % 3]:
                     st.markdown(f"""
                         <div class="card" style="text-align:center;">
                             <h4 class="brand-font" style="color:#D81B60; margin:0;">🛍️ {row['Producto']}</h4>
                             <p style="color:#D81B60; font-weight:bold; font-size:20px;">${row['Precio']:,.2f} MXN</p>
-                            <p style="font-size:12px; color:#555;">📍 {row.get('Estado', 'México')} | Stock: <b>{row['Stock']}</b></p>
+                            <p style="font-size:12px; color:#555;">📍 {row.get('Estado', 'México')} | Vendedora: {row['Email_Emprendedora']}<br>Stock: <b>{row['Stock']}</b></p>
                             <span style="background-color:#F8BBD0; color:#D81B60; padding:3px 8px; border-radius:10px; font-size:11px; font-weight:bold;">{row['Categoria']}</span>
                         </div>
                     """, unsafe_allow_html=True)
+                    
+                    if es_autora_o_fundadora:
+                        col_btn1, col_btn2 = st.columns(2)
+                        with col_btn1:
+                            with st.popover("✏️ Editar"):
+                                with st.form(f"form_edit_prod_{idx}"):
+                                    edit_p_nom = st.text_input("Producto", value=row["Producto"])
+                                    edit_p_precio = st.number_input("Precio", value=float(row["Precio"]))
+                                    edit_p_cat = st.selectbox("Categoría", LISTA_PRODUCTOS, index=LISTA_PRODUCTOS.index(row["Categoria"]) if row["Categoria"] in LISTA_PRODUCTOS else 0)
+                                    edit_p_stock = st.number_input("Stock", value=int(row["Stock"]))
+                                    btn_salvar_prod = st.form_submit_button("💾 Guardar")
+                                    
+                                    if btn_salvar_prod:
+                                        idx_m = row['index'] if 'index' in row else idx
+                                        df_prods_todos.loc[idx_m, "Producto"] = edit_p_nom
+                                        df_prods_todos.loc[idx_m, "Precio"] = float(edit_p_precio)
+                                        df_prods_todos.loc[idx_m, "Categoria"] = edit_p_cat
+                                        df_prods_todos.loc[idx_m, "Stock"] = int(edit_p_stock)
+                                        guardar_datos(df_prods_todos, ARCHIVO_PRODUCTOS)
+                                        st.success("¡Producto actualizado!")
+                                        st.rerun()
+
+                        with col_btn2:
+                            if st.button("🗑️ Borrar", key=f"btn_del_prod_{idx}"):
+                                idx_eliminar = row['index'] if 'index' in row else idx
+                                df_prods_todos = df_prods_todos.drop(index=idx_eliminar).reset_index(drop=True)
+                                guardar_datos(df_prods_todos, ARCHIVO_PRODUCTOS)
+                                st.success(f"¡Publicación eliminada!")
+                                st.rerun()
 
     # --- PESTAÑA 3: MAPA INTERACTIVO DE MÉXICO ---
     with pestañas[2]:
@@ -752,13 +775,78 @@ else:
         else:
             st.warning("🔒 Los talleres educativos de costos y marketing son exclusivos para Emprendedoras VIP.")
 
-    # --- PESTAÑA DASHBOARD ADMIN ---
+    # --- DASHBOARD ADMIN EXCLUSIVO DE LARISSA GARCÍA (FUNDADORA) ---
     idx_pago = 7
     if st.session_state["es_admin"]:
         idx_pago = 8
         with pestañas[7]:
-            st.markdown('<h3 class="brand-font" style="color:#D81B60;">👑 Panel de Control de Larissa García (Fundadora)</h3>', unsafe_allow_html=True)
-            st.dataframe(df_emprendedoras)
+            st.markdown('<h3 class="brand-font" style="color:#D81B60;">👑 Módulo Exclusivo de Aprobación de Larissa García (Fundadora)</h3>', unsafe_allow_html=True)
+            
+            tab_aprob_emp, tab_aprob_prod, tab_bd_general = st.tabs([
+                "✅ Aprobación de Emprendedoras", 
+                "🛍️ Aprobación de Productos Marketplace", 
+                "📊 Base de Datos General"
+            ])
+            
+            with tab_aprob_emp:
+                st.subheader("Solicitudes de Emprendedoras Pendientes de Aprobación")
+                df_pendientes = df_emprendedoras[df_emprendedoras["Estado_Aprobacion"] == "Pendiente"]
+                
+                if df_pendientes.empty:
+                    st.info("No hay perfiles pendientes de aprobación.")
+                else:
+                    for idx_p, row_p in df_pendientes.reset_index().iterrows():
+                        st.markdown(f"""
+                            <div class="card">
+                                <b>Emprendedora:</b> {row_p['Nombre']} ({row_p['Email']})<br>
+                                <b>Negocio:</b> {row_p['Negocio']} ({row_p['Tipo_Oferta']} - {row_p['Categoria']})<br>
+                                <b>Ubicación:</b> {row_p['Estado']} • {row_p['Ciudad']}<br>
+                                <b>CURP:</b> <code>{row_p.get('CURP_Valor','N/A')}</code> | <b>INE:</b> {row_p.get('INE_Doc','N/A')}
+                            </div>
+                        """, unsafe_allow_html=True)
+                        if st.button(f"✅ Autorizar Perfil de {row_p['Nombre']}", key=f"btn_admin_aprob_{idx_p}"):
+                            idx_orig = row_p['index'] if 'index' in row_p else idx_p
+                            df_emprendedoras.loc[idx_orig, "Estado_Aprobacion"] = "Aprobado"
+                            guardar_datos(df_emprendedoras, ARCHIVO_CSV)
+                            st.success(f"¡Perfil de {row_p['Nombre']} aprobado por la Fundadora!")
+                            st.rerun()
+
+            with tab_aprob_prod:
+                st.subheader("Productos Pendientes para el Marketplace")
+                df_prods_todos = cargar_productos()
+                df_prods_pend = df_prods_todos[df_prods_todos["Estado_Aprobacion"] == "Pendiente"]
+                
+                if df_prods_pend.empty:
+                    st.info("No hay productos pendientes de revisión.")
+                else:
+                    for idx_pr, row_pr in df_prods_pend.reset_index().iterrows():
+                        st.markdown(f"""
+                            <div class="card">
+                                <b>Producto:</b> {row_pr['Producto']} | <b>Precio:</b> ${row_pr['Precio']} MXN<br>
+                                <b>Vendedora:</b> {row_pr['Email_Emprendedora']}<br>
+                                <b>Categoría:</b> {row_pr['Categoria']} | <b>Stock:</b> {row_pr['Stock']}
+                            </div>
+                        """, unsafe_allow_html=True)
+                        
+                        col_ap, col_el = st.columns(2)
+                        with col_ap:
+                            if st.button(f"✅ Autorizar '{row_pr['Producto']}'", key=f"btn_aprob_prod_{idx_pr}"):
+                                idx_p_orig = row_pr['index'] if 'index' in row_pr else idx_pr
+                                df_prods_todos.loc[idx_p_orig, "Estado_Aprobacion"] = "Aprobado"
+                                guardar_datos(df_prods_todos, ARCHIVO_PRODUCTOS)
+                                st.success(f"¡Producto '{row_pr['Producto']}' publicado en el Marketplace!")
+                                st.rerun()
+                        with col_el:
+                            if st.button(f"🗑️ Rechazar / Borrar '{row_pr['Producto']}'", key=f"btn_del_pend_{idx_pr}"):
+                                idx_p_orig = row_pr['index'] if 'index' in row_pr else idx_pr
+                                df_prods_todos = df_prods_todos.drop(index=idx_p_orig).reset_index(drop=True)
+                                guardar_datos(df_prods_todos, ARCHIVO_PRODUCTOS)
+                                st.success(f"¡Producto '{row_pr['Producto']}' rechazado!")
+                                st.rerun()
+
+            with tab_bd_general:
+                st.subheader("Registros Globales")
+                st.dataframe(df_emprendedoras)
 
     # --- PESTAÑA FINAL: PAGO Y REGISTRO ---
     with pestañas[idx_pago]:
