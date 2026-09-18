@@ -22,7 +22,7 @@ CORREO_ADMIN = "garcialarissa1292@gmail.com"
 NOMBRE_FUNDADORA = "Larissa García"
 LOGO_IMAGEN = "Empoder Arte Order_blanco_2.png"
 
-# Imagen de respaldo por defecto en caso de no haber cargado foto
+# Imagen de respaldo neutral
 FOTO_DEFAULT = "https://picsum.photos/150"
 
 ESTADOS_MEXICO = [
@@ -77,8 +77,8 @@ def cargar_imagen_segura(ruta):
 
 def convertir_imagen_a_base64(uploaded_file):
     """
-    Convierte cualquier archivo de imagen subido a una cadena Data URI en Base64 limpia.
-    Permite visualizar la foto de perfil en formato circular sin errores de renderizado.
+    Convierte cualquier archivo de imagen subido a una cadena Data URI Base64 limpia
+    y optimizada para Streamlit Cloud.
     """
     if uploaded_file is not None:
         try:
@@ -91,8 +91,11 @@ def convertir_imagen_a_base64(uploaded_file):
             if image.mode in ("RGBA", "P"):
                 image = image.convert("RGB")
                 
+            # Redimensionamos ligeramente para mantener el CSV liviano en la nube
+            image.thumbnail((300, 300))
+            
             buffered = BytesIO()
-            image.save(buffered, format="JPEG", quality=90)
+            image.save(buffered, format="JPEG", quality=85)
             img_b64_str = base64.b64encode(buffered.getvalue()).decode("utf-8").replace("\n", "").replace("\r", "")
             return f"data:image/jpeg;base64,{img_b64_str}"
         except Exception:
@@ -136,7 +139,6 @@ def cargar_datos():
                     if col not in df.columns:
                         df[col] = "Querétaro" if col == "Estado" else ("Aprobado" if col == "Estado_Aprobacion" else (FOTO_DEFAULT if col == "Foto_Perfil" else "Por definir"))
                 
-                # Reemplazar valores de marcadores de posición rotos o vacíos con la URL por defecto
                 df["Foto_Perfil"] = df["Foto_Perfil"].fillna(FOTO_DEFAULT)
                 df.loc[df["Foto_Perfil"].str.contains("via.placeholder.com", na=False), "Foto_Perfil"] = FOTO_DEFAULT
                 
@@ -421,7 +423,7 @@ with pestañas[0]:
             contacto_valor = CORREO_ADMIN if es_fundadora else row.get('Contacto', CORREO_ADMIN)
             foto_url_perfil = row.get('Foto_Perfil', FOTO_DEFAULT)
             
-            # Renderizado circular seguro de la Foto de Perfil
+            # Renderizado circular de la Foto de Perfil
             st.markdown(f"""
                 <div class="card">
                     <div style="display: flex; align-items: center; margin-bottom: 12px;">
