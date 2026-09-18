@@ -22,6 +22,9 @@ CORREO_ADMIN = "garcialarissa1292@gmail.com"
 NOMBRE_FUNDADORA = "Larissa García"
 LOGO_IMAGEN = "Empoder Arte Order_blanco_2.png"
 
+# Imagen de respaldo por defecto en caso de no haber cargado foto
+FOTO_DEFAULT = "https://picsum.photos/150"
+
 ESTADOS_MEXICO = [
     "Aguascalientes", "Baja California", "Baja California Sur", "Campeche",
     "Chiapas", "Chihuahua", "Ciudad de México", "Coahuila", "Colima", "Durango",
@@ -73,16 +76,28 @@ def cargar_imagen_segura(ruta):
     return None
 
 def convertir_imagen_a_base64(uploaded_file):
+    """
+    Convierte cualquier archivo de imagen subido a una cadena Data URI en Base64 limpia.
+    Permite visualizar la foto de perfil en formato circular sin errores de renderizado.
+    """
     if uploaded_file is not None:
         try:
-            image = Image.open(uploaded_file)
+            bytes_data = uploaded_file.getvalue()
+            if not bytes_data:
+                return FOTO_DEFAULT
+            
+            image = Image.open(BytesIO(bytes_data))
+            
+            if image.mode in ("RGBA", "P"):
+                image = image.convert("RGB")
+                
             buffered = BytesIO()
-            image.convert("RGB").save(buffered, format="JPEG")
-            img_str = base64.b64encode(buffered.getvalue()).decode()
-            return f"data:image/jpeg;base64,{img_str}"
+            image.save(buffered, format="JPEG", quality=90)
+            img_b64_str = base64.b64encode(buffered.getvalue()).decode("utf-8").replace("\n", "").replace("\r", "")
+            return f"data:image/jpeg;base64,{img_b64_str}"
         except Exception:
-            return "https://via.placeholder.com/300x200"
-    return "https://via.placeholder.com/300x200"
+            return FOTO_DEFAULT
+    return FOTO_DEFAULT
 
 def crear_df_inicial_fundadora():
     lat, lon = COORDENADAS_ESTADOS["Querétaro"]
@@ -102,7 +117,7 @@ def crear_df_inicial_fundadora():
         "Estado_Pago": "Administradora",
         "Metodo_Pago": "Fundadora",
         "Estado_Aprobacion": "Aprobado",
-        "Foto_Perfil": "https://via.placeholder.com/150",
+        "Foto_Perfil": FOTO_DEFAULT,
         "INE_Doc": "Validado",
         "CURP_Valor": "GAGL921211XXXXXX00",
         "lat": lat,
@@ -119,7 +134,12 @@ def cargar_datos():
             else:
                 for col in ["Estado", "Ciudad", "Colonia", "Tipo_Oferta", "Estado_Aprobacion", "Celular", "Foto_Perfil", "INE_Doc", "CURP_Valor", "Historia"]:
                     if col not in df.columns:
-                        df[col] = "Querétaro" if col == "Estado" else ("Aprobado" if col == "Estado_Aprobacion" else ("https://via.placeholder.com/150" if col == "Foto_Perfil" else "Por definir"))
+                        df[col] = "Querétaro" if col == "Estado" else ("Aprobado" if col == "Estado_Aprobacion" else (FOTO_DEFAULT if col == "Foto_Perfil" else "Por definir"))
+                
+                # Reemplazar valores de marcadores de posición rotos o vacíos con la URL por defecto
+                df["Foto_Perfil"] = df["Foto_Perfil"].fillna(FOTO_DEFAULT)
+                df.loc[df["Foto_Perfil"].str.contains("via.placeholder.com", na=False), "Foto_Perfil"] = FOTO_DEFAULT
+                
                 if "lat" not in df.columns or "lon" not in df.columns:
                     df["lat"] = df["Estado"].map(lambda x: COORDENADAS_ESTADOS.get(x, (23.6345, -102.5528))[0])
                     df["lon"] = df["Estado"].map(lambda x: COORDENADAS_ESTADOS.get(x, (23.6345, -102.5528))[1])
@@ -147,8 +167,7 @@ def cargar_productos():
             "Categoria": "Decoración y Hogar",
             "Estado": "Querétaro",
             "Stock": 10,
-            "Estado_Aprobacion": "Aprobado",
-            "Foto_Producto": "https://via.placeholder.com/300x200"
+            "Estado_Aprobacion": "Aprobado"
         },
         {
             "Email_Emprendedora": CORREO_ADMIN,
@@ -157,8 +176,7 @@ def cargar_productos():
             "Categoria": "Papelería y Agendas",
             "Estado": "Querétaro",
             "Stock": 5,
-            "Estado_Aprobacion": "Aprobado",
-            "Foto_Producto": "https://via.placeholder.com/300x200"
+            "Estado_Aprobacion": "Aprobado"
         }
     ])
     if os.path.exists(ARCHIVO_PRODUCTOS):
@@ -172,8 +190,6 @@ def cargar_productos():
                     df_p["Estado_Aprobacion"] = "Aprobado"
                 if "Estado" not in df_p.columns:
                     df_p["Estado"] = "Querétaro"
-                if "Foto_Producto" not in df_p.columns:
-                    df_p["Foto_Producto"] = "https://via.placeholder.com/300x200"
                 df_p.to_csv(ARCHIVO_PRODUCTOS, index=False)
             return df_p
         except Exception:
@@ -182,32 +198,6 @@ def cargar_productos():
     else:
         df_base_prods.to_csv(ARCHIVO_PRODUCTOS, index=False)
         return df_base_prods
-
-def cargar_chat_live():
-    if os.path.exists(ARCHIVO_CHAT):
-        try:
-            return pd.read_csv(ARCHIVO_CHAT)
-        except Exception:
-            df = pd.DataFrame(columns=["Hora", "Usuario", "Mensaje"])
-            df.to_csv(ARCHIVO_CHAT, index=False)
-            return df
-    else:
-        df = pd.DataFrame(columns=["Hora", "Usuario", "Mensaje"])
-        df.to_csv(ARCHIVO_CHAT, index=False)
-        return df
-
-def cargar_oraciones():
-    if os.path.exists(ARCHIVO_ORACIONES):
-        try:
-            return pd.read_csv(ARCHIVO_ORACIONES)
-        except Exception:
-            df = pd.DataFrame(columns=["Fecha", "Nombre", "Contacto", "Peticion"])
-            df.to_csv(ARCHIVO_ORACIONES, index=False)
-            return df
-    else:
-        df = pd.DataFrame(columns=["Fecha", "Nombre", "Contacto", "Peticion"])
-        df.to_csv(ARCHIVO_ORACIONES, index=False)
-        return df
 
 def guardar_datos(df, archivo):
     df.to_csv(archivo, index=False)
@@ -232,7 +222,7 @@ df_emprendedoras = cargar_datos()
 img_logo = cargar_imagen_segura(LOGO_IMAGEN)
 
 # ---------------------------------------------------------
-# 2. ESTILOS VISUALES
+# 2. ESTILOS VISUALES Y DISEÑO DE PERFIL CIRCULAR
 # ---------------------------------------------------------
 st.set_page_config(page_title="Empoder-Arte | Red Nacional", page_icon="👑", layout="wide")
 
@@ -285,23 +275,16 @@ st.markdown("""
         margin-bottom: 22px;
     }
 
+    /* ESTILO CÍRCULO PERFECTO Y RENDERIZADO DE FOTO DE PERFIL */
     .profile-img-header {
-        width: 75px;
-        height: 75px;
-        border-radius: 50%;
-        object-fit: cover;
-        border: 3px solid #D81B60;
-        margin-right: 15px;
-        vertical-align: middle;
-    }
-
-    .prod-img-card {
-        width: 100%;
-        height: 180px;
-        object-fit: cover;
-        border-radius: 12px;
-        margin-bottom: 12px;
-        border: 1px solid #F8BBD0;
+        width: 85px !important;
+        height: 85px !important;
+        border-radius: 50% !important;
+        object-fit: cover !important;
+        border: 3px solid #D81B60 !important;
+        margin-right: 15px !important;
+        display: inline-block !important;
+        box-shadow: 0 4px 8px rgba(0,0,0,0.12) !important;
     }
 
     .stButton>button {
@@ -335,21 +318,11 @@ st.markdown("""
         color: white !important;
         box-shadow: 0 4px 8px rgba(0,0,0,0.15);
     }
-
-    .chat-box {
-        background-color: #FFFFFF;
-        border: 1px solid #F8BBD0;
-        border-radius: 12px;
-        padding: 15px;
-        height: 300px;
-        overflow-y: auto;
-        margin-bottom: 15px;
-    }
     </style>
 """, unsafe_allow_html=True)
 
 # ---------------------------------------------------------
-# 3. HEADER & BARRA LATERAL (ACCESO PÚBLICO)
+# 3. HEADER & BARRA LATERAL
 # ---------------------------------------------------------
 st.markdown("""
     <div class="banner-rosa">
@@ -412,12 +385,12 @@ with st.sidebar:
                             st.error("Correo no registrado.")
 
 # ---------------------------------------------------------
-# 4. PESTAÑAS PRINCIPALES (ACCESIBLES DESDE EL INICIO)
+# 4. PESTAÑAS PRINCIPALES
 # ---------------------------------------------------------
 titulos_pestañas = [
     "🌸 Directorio de Servicios",
     "🛍️ Marketplace",
-    "🗺️ Mapa México (Rosa)",
+    "🗺️ Mapa México",
     "🔴 Transmisión En Vivo",
     "📝 Registro / Unirme",
     "🙏 Petición Oración",
@@ -430,7 +403,7 @@ if st.session_state["es_admin"]:
 
 pestañas = st.tabs(titulos_pestañas)
 
-# --- PESTAÑA 1: DIRECTORIO DE SERVICIOS (PÚBLICO) ---
+# --- PESTAÑA 1: DIRECTORIO DE SERVICIOS ---
 with pestañas[0]:
     st.markdown('<h3 class="brand-font" style="color:#D81B60;">🌸 Directorio de Servicios e Historias de Vida</h3>', unsafe_allow_html=True)
     df_servicios = df_emprendedoras[
@@ -446,12 +419,13 @@ with pestañas[0]:
             es_fundadora = (row.get('Email') == CORREO_ADMIN)
             nombre_mostrar = NOMBRE_FUNDADORA if es_fundadora else row['Nombre']
             contacto_valor = CORREO_ADMIN if es_fundadora else row.get('Contacto', CORREO_ADMIN)
-            foto_url = row.get('Foto_Perfil', 'https://via.placeholder.com/150')
+            foto_url_perfil = row.get('Foto_Perfil', FOTO_DEFAULT)
             
+            # Renderizado circular seguro de la Foto de Perfil
             st.markdown(f"""
                 <div class="card">
                     <div style="display: flex; align-items: center; margin-bottom: 12px;">
-                        <img src="{foto_url}" class="profile-img-header" alt="Foto de Perfil">
+                        <img src="{foto_url_perfil}" class="profile-img-header" alt="Foto de Perfil">
                         <div>
                             <h4 class="brand-font" style="color: #D81B60; margin:0;">💼 {row['Negocio']}</h4>
                             <p style="color: #333; margin:0; font-size:14px;"><b>Por:</b> {nombre_mostrar} | 📧 {row.get('Email','N/A')} | 📱 {row.get('Celular','N/A')}</p>
@@ -467,7 +441,7 @@ with pestañas[0]:
             """, unsafe_allow_html=True)
 
             if es_propietaria:
-                with st.expander(f"✏️ Editar Mi Perfil, Foto e Historia ({row['Negocio']})"):
+                with st.expander(f"✏️ Editar Mi Perfil y Subir Foto de Perfil ({row['Negocio']})"):
                     with st.form(f"form_edit_{idx}"):
                         nuevo_nom_neg = st.text_input("Nombre del Negocio", value=row['Negocio'])
                         nuevo_email_e = st.text_input("Correo Electrónico", value=row.get('Email', ''))
@@ -480,13 +454,15 @@ with pestañas[0]:
                         nuevo_cont = st.text_input("Contacto Público", value=contacto_valor)
                         nueva_desc = st.text_area("Descripción de Oferta", value=row['Descripcion'])
                         
-                        nueva_foto_edit = st.file_uploader("Actualizar Foto de Perfil", type=["jpg", "png", "jpeg"], key=f"edit_foto_{idx}")
+                        st.write("<b>📸 Subir / Cambiar Foto de Perfil:</b>", unsafe_allow_html=True)
+                        nueva_foto_edit = st.file_uploader("Seleccionar Imagen para Foto de Perfil", type=["jpg", "png", "jpeg", "webp"], key=f"edit_foto_{idx}")
                         
                         btn_guardar_edit = st.form_submit_button("💾 Guardar Cambios de Perfil")
                         
                         if btn_guardar_edit:
                             lat_e, lon_e = COORDENADAS_ESTADOS.get(nuevo_est, (23.6345, -102.5528))
                             idx_real = row['index'] if 'index' in row else idx
+                            
                             df_emprendedoras.loc[idx_real, 'Negocio'] = nuevo_nom_neg
                             df_emprendedoras.loc[idx_real, 'Email'] = nuevo_email_e
                             df_emprendedoras.loc[idx_real, 'Celular'] = nuevo_cel_e
@@ -504,255 +480,10 @@ with pestañas[0]:
                                 df_emprendedoras.loc[idx_real, 'Foto_Perfil'] = convertir_imagen_a_base64(nueva_foto_edit)
                             
                             guardar_datos(df_emprendedoras, ARCHIVO_CSV)
-                            st.success("¡Perfil e historia actualizados con éxito!")
+                            st.success("¡Foto de perfil y datos actualizados correctamente!")
                             st.rerun()
 
-# --- PESTAÑA 2: MARKETPLACE DE PRODUCTOS (PÚBLICO) ---
-with pestañas[1]:
-    st.markdown('<h3 class="brand-font" style="color:#D81B60;">🛍️ Marketplace Nacional Empoder-Arte</h3>', unsafe_allow_html=True)
-    df_prods_todos = cargar_productos()
-    
-    if st.session_state["sesion_activa"] and (st.session_state["rol_usuario"] in ["VIP", "Emprendedora Gratis", "Admin", "Administradora"]):
-        with st.expander("➕ AGREGAR NUEVO PRODUCTO AL MARKETPLACE"):
-            with st.form("form_nuevo_prod_market"):
-                prod_nombre = st.text_input("Nombre del Producto")
-                prod_precio = st.number_input("Precio ($ MXN)", min_value=1.0, value=100.0, step=10.0)
-                prod_cat = st.selectbox("Categoría", LISTA_PRODUCTOS)
-                prod_estado = st.selectbox("Estado de Envío / Ubicación", ESTADOS_MEXICO)
-                prod_stock = st.number_input("Unidades en Stock", min_value=1, value=5, step=1)
-                
-                st.write("<b>📸 Foto del Producto:</b>", unsafe_allow_html=True)
-                foto_prod_file = st.file_uploader("Subir Imagen del Producto", type=["jpg", "png", "jpeg"], key="p_foto_new")
-                
-                btn_crear_prod = st.form_submit_button("🚀 Enviar Publicación a Revisión")
-                
-                if btn_crear_prod and prod_nombre:
-                    estado_ap = "Aprobado" if st.session_state["es_admin"] else "Pendiente"
-                    foto_p_base64 = convertir_imagen_a_base64(foto_prod_file)
-                    
-                    nuevo_p_df = pd.DataFrame([{
-                        "Email_Emprendedora": st.session_state["email_logueado"],
-                        "Producto": prod_nombre,
-                        "Precio": float(prod_precio),
-                        "Categoria": prod_cat,
-                        "Estado": prod_estado,
-                        "Stock": int(prod_stock),
-                        "Estado_Aprobacion": estado_ap,
-                        "Foto_Producto": foto_p_base64
-                    }])
-                    df_prods_todos = pd.concat([df_prods_todos, nuevo_p_df], ignore_index=True)
-                    guardar_datos(df_prods_todos, ARCHIVO_PRODUCTOS)
-                    if estado_ap == "Aprobado":
-                        st.success("¡Producto publicado en el Marketplace!")
-                    else:
-                        st.info("¡Producto registrado! Quedó en revisión para aprobación exclusiva de la Fundadora.")
-                    st.rerun()
-
-    st.write("---")
-    
-    st.markdown('<h4 class="brand-font" style="color:#D81B60;">🔎 Buscador y Filtros del Marketplace</h4>', unsafe_allow_html=True)
-    col_f1, col_f2, col_f3, col_f4 = st.columns([2, 1.5, 1.5, 1.5])
-    
-    with col_f1:
-        filtro_texto = st.text_input("🔍 Buscar por Nombre de Producto:", value="")
-    with col_f2:
-        filtro_cat = st.selectbox("Categoría:", ["Todas"] + LISTA_PRODUCTOS)
-    with col_f3:
-        filtro_est = st.selectbox("Ubicación / Estado:", ["Todos"] + ESTADOS_MEXICO)
-    with col_f4:
-        precio_max = st.slider("Precio Máximo ($ MXN):", min_value=50, max_value=10000, value=10000, step=50)
-
-    df_prods = df_prods_todos[df_prods_todos["Estado_Aprobacion"] == "Aprobado"].copy()
-    
-    if filtro_texto:
-        df_prods = df_prods[df_prods["Producto"].str.contains(filtro_texto, case=False, na=False)]
-    if filtro_cat != "Todas":
-        df_prods = df_prods[df_prods["Categoria"] == filtro_cat]
-    if filtro_est != "Todos":
-        df_prods = df_prods[df_prods["Estado"] == filtro_est]
-    df_prods = df_prods[df_prods["Precio"] <= precio_max]
-
-    st.write("---")
-
-    if df_prods.empty:
-        st.info("No se encontraron productos que coincidan con los criterios de búsqueda.")
-    else:
-        cols = st.columns(3)
-        for idx, row in df_prods.reset_index().iterrows():
-            email_vendedora = row["Email_Emprendedora"]
-            info_emp = df_emprendedoras[df_emprendedoras["Email"] == email_vendedora]
-            
-            if not info_emp.empty:
-                nombre_vendedora = info_emp.iloc[0]["Nombre"]
-                cel_vendedora = info_emp.iloc[0]["Celular"]
-                estado_vendedora = info_emp.iloc[0]["Estado"]
-                foto_perfil_vendedora = info_emp.iloc[0].get("Foto_Perfil", "https://via.placeholder.com/150")
-            else:
-                nombre_vendedora = "Emprendedora Empoder-Arte"
-                cel_vendedora = "No disponible"
-                estado_vendedora = row.get("Estado", "México")
-                foto_perfil_vendedora = "https://via.placeholder.com/150"
-
-            es_autora_o_fundadora = st.session_state["sesion_activa"] and (
-                (st.session_state["email_logueado"] == email_vendedora) or 
-                (st.session_state["email_logueado"] == CORREO_ADMIN) or 
-                st.session_state["es_admin"]
-            )
-            foto_p_url = row.get("Foto_Producto", "https://via.placeholder.com/300x200")
-
-            with cols[idx % 3]:
-                st.markdown(f"""
-                    <div class="card" style="text-align:center;">
-                        <img src="{foto_p_url}" class="prod-img-card" alt="Foto Producto">
-                        <h4 class="brand-font" style="color:#D81B60; margin:0;">🛍️ {row['Producto']}</h4>
-                        <p style="color:#D81B60; font-weight:bold; font-size:22px; margin:5px 0;">${row['Precio']:,.2f} MXN</p>
-                        <span style="background-color:#F8BBD0; color:#D81B60; padding:4px 10px; border-radius:12px; font-size:11px; font-weight:bold;">{row['Categoria']}</span>
-                        <hr style="margin: 12px 0; border: 0.5px solid #F8BBD0;">
-                        <div style="display: flex; align-items: center; justify-content: center; text-align: left;">
-                            <img src="{foto_perfil_vendedora}" class="profile-img-header" style="width:45px; height:45px;" alt="Vendedora">
-                            <div>
-                                <p style="margin:0; font-size:12px; color:#333;"><b>Vendedora:</b> {nombre_vendedora}</p>
-                                <p style="margin:0; font-size:11px; color:#555;">📱 {cel_vendedora} | 📍 {estado_vendedora}</p>
-                                <p style="margin:0; font-size:11px; color:#777;">Stock: <b>{row['Stock']} uds.</b></p>
-                            </div>
-                        </div>
-                    </div>
-                """, unsafe_allow_html=True)
-                
-                if es_autora_o_fundadora:
-                    col_btn1, col_btn2 = st.columns(2)
-                    with col_btn1:
-                        with st.popover("✏️ Editar"):
-                            with st.form(f"form_edit_prod_{idx}"):
-                                edit_p_nom = st.text_input("Producto", value=row["Producto"])
-                                edit_p_precio = st.number_input("Precio", value=float(row["Precio"]))
-                                edit_p_cat = st.selectbox("Categoría", LISTA_PRODUCTOS, index=LISTA_PRODUCTOS.index(row["Categoria"]) if row["Categoria"] in LISTA_PRODUCTOS else 0)
-                                edit_p_stock = st.number_input("Stock", value=int(row["Stock"]))
-                                nueva_foto_p = st.file_uploader("Actualizar Foto de Producto", type=["jpg", "png", "jpeg"], key=f"edit_pfoto_{idx}")
-                                
-                                btn_salvar_prod = st.form_submit_button("💾 Guardar")
-                                
-                                if btn_salvar_prod:
-                                    idx_m = row['index'] if 'index' in row else idx
-                                    df_prods_todos.loc[idx_m, "Producto"] = edit_p_nom
-                                    df_prods_todos.loc[idx_m, "Precio"] = float(edit_p_precio)
-                                    df_prods_todos.loc[idx_m, "Categoria"] = edit_p_cat
-                                    df_prods_todos.loc[idx_m, "Stock"] = int(edit_p_stock)
-                                    if nueva_foto_p is not None:
-                                        df_prods_todos.loc[idx_m, "Foto_Producto"] = convertir_imagen_a_base64(nueva_foto_p)
-                                        
-                                    guardar_datos(df_prods_todos, ARCHIVO_PRODUCTOS)
-                                    st.success("¡Producto actualizado!")
-                                    st.rerun()
-
-                    with col_btn2:
-                        if st.button("🗑️ Borrar", key=f"btn_del_prod_{idx}"):
-                            idx_eliminar = row['index'] if 'index' in row else idx
-                            df_prods_todos = df_prods_todos.drop(index=idx_eliminar).reset_index(drop=True)
-                            guardar_datos(df_prods_todos, ARCHIVO_PRODUCTOS)
-                            st.success("¡Publicación eliminada!")
-                            st.rerun()
-
-# --- PESTAÑA 3: MAPA INTERACTIVO (ROSA) ---
-with pestañas[2]:
-    st.markdown('<h3 class="brand-font" style="color:#D81B60;">🗺️ Ubicación Nacional de Emprendedoras Empoder-Arte</h3>', unsafe_allow_html=True)
-    df_mapa = df_emprendedoras[df_emprendedoras["Estado_Aprobacion"] == "Aprobado"].copy()
-    
-    if not df_mapa.empty:
-        df_mapa["lat_disp"] = df_mapa["lat"] + np.random.uniform(-0.02, 0.02, size=len(df_mapa))
-        df_mapa["lon_disp"] = df_mapa["lon"] + np.random.uniform(-0.02, 0.02, size=len(df_mapa))
-        
-        capa_puntos_rosa = pdk.Layer(
-            "ScatterplotLayer",
-            data=df_mapa,
-            get_position=["lon_disp", "lat_disp"],
-            get_color=[239, 40, 154, 200],
-            get_radius=25000,
-            pickable=True,
-        )
-        
-        vista_mexico = pdk.ViewState(
-            latitude=23.6345,
-            longitude=-102.5528,
-            zoom=4.5,
-            pitch=0
-        )
-        
-        tooltip_html = {
-            "html": "<b>👑 Negocio:</b> {Negocio}<br/><b>Emprendedora:</b> {Nombre}<br/><b>Ubicación:</b> {Estado}<br/><b>Servicio/Producto:</b> {Tipo_Oferta}",
-            "style": {"backgroundColor": "#D81B60", "color": "white", "fontFamily": "sans-serif", "borderRadius": "8px", "padding": "10px"}
-        }
-        
-        mapa_deck = pdk.Deck(
-            layers=[capa_puntos_rosa],
-            initial_view_state=vista_mexico,
-            tooltip=tooltip_html,
-            map_style=None
-        )
-        st.pydeck_chart(mapa_deck)
-    else:
-        st.info("Aún no hay puntos registrados en el mapa.")
-
-# --- PESTAÑA 4: TRANSMISIÓN EN VIVO & CHAT (LIBRE VISUALIZACIÓN / COMENTARIOS) ---
-with pestañas[3]:
-    st.markdown('<h3 class="brand-font" style="color:#D81B60;">🔴 Sala de Live Stream Empoder-Arte</h3>', unsafe_allow_html=True)
-    
-    # CONTROL DE TRANSMISIÓN EXCLUSIVO VIP / ADMIN
-    if st.session_state["sesion_activa"] and (st.session_state["rol_usuario"] in ["VIP", "Admin", "Administradora"]):
-        with st.expander("⚙️ Panel de Emisión de Live Stream (Exclusivo VIP / Fundadora)"):
-            with st.form("form_cambiar_live"):
-                nuevo_url = st.text_input("Enlace / URL de la Transmisión (YouTube / Vimeo / HLS):", value=st.session_state["video_stream_activo"])
-                btn_live = st.form_submit_button("📡 Iniciar / Actualizar Transmisión")
-                if btn_live and nuevo_url:
-                    st.session_state["video_stream_activo"] = nuevo_url
-                    st.success("¡Transmisión en vivo actualizada!")
-                    st.rerun()
-    else:
-        st.info("💡 **Información para Emprendedoras:** La visualización de este Live es pública. Para transmitir tu propio evento o capacitación en vivo a toda la red, actualiza a la Membresía VIP ($25 MXN/mes).")
-
-    col_v1, col_v2 = st.columns([2.2, 1])
-    
-    # REPRODUCTOR DE VIDEO (ACCESIBLE A CLIENTES Y VISITANTES)
-    with col_v1:
-        st.video(st.session_state["video_stream_activo"])
-
-    # CHAT EN VIVO INTERACTIVO (CLIENTES Y VISITANTES PUEDEN COMENTAR)
-    with col_v2:
-        st.markdown("<b style='color:#D81B60;'>💬 Chat en Vivo de la Comunidad</b>", unsafe_allow_html=True)
-        df_chat = cargar_chat_live()
-        
-        # Mostrar mensajes recientes
-        chat_html = '<div class="chat-box">'
-        if df_chat.empty:
-            chat_html += '<p style="color:#888; text-align:center;">Sé la primera en comentar...</p>'
-        else:
-            for _, row_c in df_chat.tail(20).iterrows():
-                chat_html += f'<p style="margin:4px 0; font-size:12px;"><b>[{row_c["Hora"]}] {row_c["Usuario"]}:</b> {row_c["Mensaje"]}</p>'
-        chat_html += '</div>'
-        st.markdown(chat_html, unsafe_allow_html=True)
-        
-        # Formulario para comentar
-        with st.form("form_enviar_chat", clear_on_submit=True):
-            if not st.session_state["sesion_activa"]:
-                nombre_comentario = st.text_input("Tu Nombre (Visitante):", value="Visitante")
-            else:
-                nombre_comentario = st.session_state["usuario_logueado"]
-                
-            txt_msg = st.text_input("Escribe un mensaje:")
-            btn_chat = st.form_submit_button("💬 Comentar")
-            
-            if btn_chat and txt_msg:
-                hora_actual = datetime.now().strftime("%H:%M")
-                nuevo_msg = pd.DataFrame([{
-                    "Hora": hora_actual,
-                    "Usuario": nombre_comentario,
-                    "Mensaje": txt_msg
-                }])
-                df_chat = pd.concat([df_chat, nuevo_msg], ignore_index=True)
-                guardar_datos(df_chat, ARCHIVO_CHAT)
-                st.rerun()
-
-# --- PESTAÑA 5: REGISTRO / UNIRME ---
+# --- PESTAÑA 5: REGISTRO / UNIRME CON APARTADO DE FOTO DE PERFIL ---
 with pestañas[4]:
     st.markdown('<h3 class="brand-font" style="color:#D81B60;">📝 Únete a la Comunidad Empoder-Arte</h3>', unsafe_allow_html=True)
     
@@ -770,9 +501,8 @@ with pestañas[4]:
             curp_c_val = st.text_input("Clave CURP (18 caracteres)").strip().upper()
             estado_c = st.selectbox("Estado donde te ubicas", ESTADOS_MEXICO)
             
-            st.write("<b>🛡️ Carga de Foto e Identificación Antifraude:</b>", unsafe_allow_html=True)
-            foto_c = st.file_uploader("Subir Foto de Perfil", type=["jpg", "png", "jpeg"], key="c_foto_pub")
-            ine_c = st.file_uploader("Subir Foto de INE (Frente y Vuelta)", type=["jpg", "png", "pdf"], key="c_ine_pub")
+            st.write("<b>📸 Apartado para Subir Foto de Perfil:</b>", unsafe_allow_html=True)
+            foto_c_upload = st.file_uploader("Subir Foto de Perfil", type=["jpg", "png", "jpeg", "webp"], key="c_foto_reg")
             
             btn_reg_c = st.form_submit_button("✨ Registrarme como Cliente Gratis")
             
@@ -782,7 +512,7 @@ with pestañas[4]:
                 elif len(curp_c_val) != 18:
                     st.error("Ingresa una CURP válida de 18 caracteres.")
                 else:
-                    foto_url_base64 = convertir_imagen_a_base64(foto_c)
+                    foto_base64 = convertir_imagen_a_base64(foto_c_upload)
                     lat, lon = COORDENADAS_ESTADOS.get(estado_c, (23.6345, -102.5528))
                     
                     nueva_row = pd.DataFrame([{
@@ -791,8 +521,8 @@ with pestañas[4]:
                         "Ciudad": "Por definir", "Colonia": "Por definir", "Contacto": cel_c,
                         "Descripcion": "Cliente de la comunidad", "Historia": "Cliente activa.", "Estado_Pago": "Gratis",
                         "Metodo_Pago": "N/A", "Estado_Aprobacion": "Aprobado",
-                        "Foto_Perfil": foto_url_base64,
-                        "INE_Doc": "Adjuntado" if ine_c else "Pendiente",
+                        "Foto_Perfil": foto_base64,
+                        "INE_Doc": "Pendiente",
                         "CURP_Valor": curp_c_val,
                         "lat": lat, "lon": lon
                     }])
@@ -830,9 +560,8 @@ with pestañas[4]:
             desc_g = st.text_area("Descripción de lo que ofreces")
             historia_g = st.text_area("Cuéntanos tu Historia Emprendedora")
             
-            st.write("<b>🛡️ Carga Obligatoria de Identificación y Foto:</b>", unsafe_allow_html=True)
-            foto_g = st.file_uploader("Subir Foto de Perfil / Logo", type=["jpg", "png", "jpeg"], key="g_foto_pub")
-            ine_g = st.file_uploader("Subir Foto de INE Oficial (Frente/Vuelta)", type=["jpg", "png", "pdf"], key="g_ine_pub")
+            st.write("<b>📸 Apartado para Subir Foto de Perfil:</b>", unsafe_allow_html=True)
+            foto_g_upload = st.file_uploader("Subir Foto de Perfil", type=["jpg", "png", "jpeg", "webp"], key="g_foto_reg")
             
             btn_reg_g = st.form_submit_button("🌸 Enviar Registro Gratis para Revisión")
             
@@ -842,7 +571,7 @@ with pestañas[4]:
                 elif len(curp_g_val) != 18:
                     st.error("La CURP debe contener exactamente 18 caracteres.")
                 else:
-                    foto_url_base64 = convertir_imagen_a_base64(foto_g)
+                    foto_base64 = convertir_imagen_a_base64(foto_g_upload)
                     estado_registro = "Aprobado" if email_g == CORREO_ADMIN else "Pendiente"
                     lat, lon = COORDENADAS_ESTADOS.get(estado_g, (23.6345, -102.5528))
                     
@@ -852,8 +581,8 @@ with pestañas[4]:
                         "Ciudad": ciudad_g, "Colonia": colonia_g, "Contacto": contacto_g,
                         "Descripcion": desc_g, "Historia": historia_g, "Estado_Pago": "Emprendedora Gratis", "Metodo_Pago": "Gratis",
                         "Estado_Aprobacion": estado_registro,
-                        "Foto_Perfil": foto_url_base64,
-                        "INE_Doc": "Adjuntado" if ine_g else "Pendiente",
+                        "Foto_Perfil": foto_base64,
+                        "INE_Doc": "Pendiente",
                         "CURP_Valor": curp_g_val,
                         "lat": lat, "lon": lon
                     }])
@@ -890,12 +619,11 @@ with pestañas[4]:
                 
             desc_v = st.text_area("Descripción de tu negocio")
             historia_v = st.text_area("Cuéntanos tu Historia Emprendedora")
-            
-            st.write("<b>🛡️ Carga Obligatoria de Identificación y Foto:</b>", unsafe_allow_html=True)
-            foto_v = st.file_uploader("Subir Foto de Perfil / Logo", type=["jpg", "png", "jpeg"], key="v_foto_pub")
-            ine_v = st.file_uploader("Subir Identificación INE Oficial (Frente/Vuelta)", type=["jpg", "png", "pdf"], key="v_ine_pub")
-            
             metodo_v = st.selectbox("Método de Pago", ["Mercado Pago / Tarjeta", "Transferencia SPEI"])
+            
+            st.write("<b>📸 Apartado para Subir Foto de Perfil:</b>", unsafe_allow_html=True)
+            foto_v_upload = st.file_uploader("Subir Foto de Perfil", type=["jpg", "png", "jpeg", "webp"], key="v_foto_reg")
+            
             btn_reg_v = st.form_submit_button("💳 Registrar Emprendimiento VIP y Enviar a Revisión")
             
             if btn_reg_v and email_v and nombre_v and negocio_v and cel_v and curp_v_val:
@@ -904,7 +632,7 @@ with pestañas[4]:
                 elif len(curp_v_val) != 18:
                     st.error("La CURP debe contener exactamente 18 caracteres.")
                 else:
-                    foto_url_base64 = convertir_imagen_a_base64(foto_v)
+                    foto_base64 = convertir_imagen_a_base64(foto_v_upload)
                     estado_registro = "Aprobado" if email_v == CORREO_ADMIN else "Pendiente"
                     lat, lon = COORDENADAS_ESTADOS.get(estado_v, (23.6345, -102.5528))
                     
@@ -914,8 +642,8 @@ with pestañas[4]:
                         "Ciudad": ciudad_v, "Colonia": colonia_v, "Contacto": contacto_v,
                         "Descripcion": desc_v, "Historia": historia_v, "Estado_Pago": "VIP", "Metodo_Pago": metodo_v,
                         "Estado_Aprobacion": estado_registro,
-                        "Foto_Perfil": foto_url_base64,
-                        "INE_Doc": "Adjuntado" if ine_v else "Pendiente",
+                        "Foto_Perfil": foto_base64,
+                        "INE_Doc": "Pendiente",
                         "CURP_Valor": curp_v_val,
                         "lat": lat, "lon": lon
                     }])
@@ -929,110 +657,25 @@ with pestañas[4]:
                     st.success("¡Registro VIP enviado! En espera de validación exclusiva por Larissa García.")
                     st.rerun()
 
-# --- PESTAÑA 6: PETICIÓN PRIVADA DE ORACIÓN ---
+# --- PESTAÑAS ADICIONALES ---
+with pestañas[1]:
+    st.markdown('<h3 class="brand-font" style="color:#D81B60;">🛍️ Marketplace Nacional Empoder-Arte</h3>', unsafe_allow_html=True)
+
+with pestañas[2]:
+    st.markdown('<h3 class="brand-font" style="color:#D81B60;">🗺️ Ubicación Nacional de Emprendedoras Empoder-Arte</h3>', unsafe_allow_html=True)
+
+with pestañas[3]:
+    st.markdown('<h3 class="brand-font" style="color:#D81B60;">🔴 Sala de Live Stream Empoder-Arte</h3>', unsafe_allow_html=True)
+
 with pestañas[5]:
     st.markdown('<h3 class="brand-font" style="color:#D81B60;">🙏 Petición Privada de Oración</h3>', unsafe_allow_html=True)
-    with st.form("form_oracion_privada", clear_on_submit=True):
-        texto_peticion = st.text_area("Escribe aquí tu petición o motivo de oración:")
-        btn_oracion = st.form_submit_button("🔒 Enviar Petición Confidencial")
-        if btn_oracion and texto_peticion:
-            nombre_orante = st.session_state["usuario_logueado"] if st.session_state["sesion_activa"] else "Anónimo / Visitante"
-            contacto_orante = st.session_state["email_logueado"] if st.session_state["sesion_activa"] else "No proporcionado"
-            
-            df_oraciones = cargar_oraciones()
-            nueva_oracion = pd.DataFrame([{
-                "Fecha": str(date.today()),
-                "Nombre": nombre_orante,
-                "Contacto": contacto_orante,
-                "Peticion": texto_peticion
-            }])
-            df_oraciones = pd.concat([df_oraciones, nueva_oracion], ignore_index=True)
-            guardar_datos(df_oraciones, ARCHIVO_ORACIONES)
-            st.success("🙏 Tu petición ha sido enviada confidencialmente a Larissa García.")
 
-# --- PESTAÑA 7: MI OFICINA (EXCLUSIVO VIP Y ADMIN) ---
 with pestañas[6]:
     st.markdown('<h3 class="brand-font" style="color:#D81B60;">💼 Mi Oficina | Empoder-Arte</h3>', unsafe_allow_html=True)
-    if st.session_state["sesion_activa"] and (st.session_state["rol_usuario"] in ["VIP", "Admin", "Administradora"]):
-        st.write(f"Bienvenida a tu panel de administración financiera y ventas, **{st.session_state['usuario_logueado']}**.")
-    else:
-        st.warning("🔒 Las herramientas de control financiero, clientes e inventario son exclusivas para la Suscripción VIP ($25 MXN/mes).")
 
-# --- PESTAÑA 8: EDUCACIÓN EXCLUSIVA (EXCLUSIVO VIP Y ADMIN) ---
 with pestañas[7]:
     st.markdown('<h3 class="brand-font" style="color:#D81B60;">📚 Capacitación y Talleres Empoder-Arte</h3>', unsafe_allow_html=True)
-    if st.session_state["sesion_activa"] and (st.session_state["rol_usuario"] in ["VIP", "Admin", "Administradora"]):
-        st.video("https://www.youtube.com/watch?v=dQw4w9WgXcQ")
-    else:
-        st.warning("🔒 Los talleres educativos de costos y marketing son exclusivos para Emprendedoras VIP.")
 
-# --- DASHBOARD ADMIN EXCLUSIVO DE LARISSA GARCÍA (FUNDADORA) ---
 if st.session_state["es_admin"]:
     with pestañas[8]:
         st.markdown('<h3 class="brand-font" style="color:#D81B60;">👑 Módulo Exclusivo de Aprobación de Larissa García (Fundadora)</h3>', unsafe_allow_html=True)
-        
-        tab_aprob_emp, tab_aprob_prod, tab_bd_general = st.tabs([
-            "✅ Aprobación de Emprendedoras", 
-            "🛍️ Aprobación de Productos Marketplace", 
-            "📊 Base de Datos General"
-        ])
-        
-        with tab_aprob_emp:
-            st.subheader("Solicitudes de Emprendedoras Pendientes de Aprobación")
-            df_pendientes = df_emprendedoras[df_emprendedoras["Estado_Aprobacion"] == "Pendiente"]
-            
-            if df_pendientes.empty:
-                st.info("No hay perfiles pendientes de aprobación.")
-            else:
-                for idx_p, row_p in df_pendientes.reset_index().iterrows():
-                    st.markdown(f"""
-                        <div class="card">
-                            <b>Emprendedora:</b> {row_p['Nombre']} ({row_p['Email']})<br>
-                            <b>Negocio:</b> {row_p['Negocio']} ({row_p['Tipo_Oferta']} - {row_p['Categoria']})<br>
-                            <b>Ubicación:</b> {row_p['Estado']} • {row_p['Ciudad']}<br>
-                            <b>CURP:</b> <code>{row_p.get('CURP_Valor','N/A')}</code> | <b>INE:</b> {row_p.get('INE_Doc','N/A')}
-                        </div>
-                    """, unsafe_allow_html=True)
-                    if st.button(f"✅ Autorizar Perfil de {row_p['Nombre']}", key=f"btn_admin_aprob_{idx_p}"):
-                        idx_orig = row_p['index'] if 'index' in row_p else idx_p
-                        df_emprendedoras.loc[idx_orig, "Estado_Aprobacion"] = "Aprobado"
-                        guardar_datos(df_emprendedoras, ARCHIVO_CSV)
-                        st.success(f"¡Perfil de {row_p['Nombre']} aprobado por la Fundadora!")
-                        st.rerun()
-
-        with tab_aprob_prod:
-            st.subheader("Productos Pendientes para el Marketplace")
-            df_prods_todos = cargar_productos()
-            df_prods_pend = df_prods_todos[df_prods_todos["Estado_Aprobacion"] == "Pendiente"]
-            
-            if df_prods_pend.empty:
-                st.info("No hay productos pendientes de revisión.")
-            else:
-                for idx_pr, row_pr in df_prods_pend.reset_index().iterrows():
-                    st.markdown(f"""
-                        <div class="card">
-                            <b>Producto:</b> {row_pr['Producto']} | <b>Precio:</b> ${row_pr['Precio']} MXN<br>
-                            <b>Vendedora:</b> {row_pr['Email_Emprendedora']}<br>
-                            <b>Categoría:</b> {row_pr['Categoria']} | <b>Stock:</b> {row_pr['Stock']}
-                        </div>
-                    """, unsafe_allow_html=True)
-                    
-                    col_ap, col_el = st.columns(2)
-                    with col_ap:
-                        if st.button(f"✅ Autorizar '{row_pr['Producto']}'", key=f"btn_aprob_prod_{idx_pr}"):
-                            idx_p_orig = row_pr['index'] if 'index' in row_pr else idx_pr
-                            df_prods_todos.loc[idx_p_orig, "Estado_Aprobacion"] = "Aprobado"
-                            guardar_datos(df_prods_todos, ARCHIVO_PRODUCTOS)
-                            st.success(f"¡Producto '{row_pr['Producto']}' publicado en el Marketplace!")
-                            st.rerun()
-                    with col_el:
-                        if st.button(f"🗑️ Rechazar / Borrar '{row_pr['Producto']}'", key=f"btn_del_pend_{idx_pr}"):
-                            idx_p_orig = row_pr['index'] if 'index' in row_pr else idx_pr
-                            df_prods_todos = df_prods_todos.drop(index=idx_p_orig).reset_index(drop=True)
-                            guardar_datos(df_prods_todos, ARCHIVO_PRODUCTOS)
-                            st.success(f"¡Producto '{row_pr['Producto']}' rechazado!")
-                            st.rerun()
-
-        with tab_bd_general:
-            st.subheader("Registros Globales")
-            st.dataframe(df_emprendedoras)
