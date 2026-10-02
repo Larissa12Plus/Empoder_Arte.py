@@ -4,11 +4,11 @@ PROYECTO: EMPODER-ARTE (Plataforma Nacional de Emprendedoras, Ventas y Capacitac
 ARCHIVO: app.py
 AUTORA & FUNDADORA: Larissa García
 DESCRIPCIÓN: Aplicación en Streamlit con menú lateral rosa, registro directo VIP,
-             reseteo de contraseñas, baja/eliminación de usuarios, eliminación de
-             productos en Marketplace, eliminación de transacciones en finanzas,
-             peticiones de oración categorizadas con celular, guardado de lives por 5 días,
-             casilla obligatoria de privacidad, sistema de evaluaciones con estrellas
-             y amplio catálogo de versículos bíblicos de emprendimiento y trabajo.
+             reseteo de contraseñas, baja/eliminación de usuarios, edición y eliminación de
+             productos en Marketplace (restringido a dueña o administradora), eliminación de
+             transacciones en finanzas, peticiones de oración categorizadas con celular,
+             guardado de lives por 5 días, casilla obligatoria de privacidad, sistema de
+             evaluaciones con estrellas y amplio catálogo de versículos bíblicos.
 =============================================================================
 """
 import streamlit as st
@@ -970,7 +970,7 @@ with pestañas[0]:
                             st.success("¡Perfil actualizado con éxito!")
                             st.rerun()
 
-# --- PESTAÑA 2: MARKETPLACE CON ELIMINACIÓN DE PUBLICACIONES ---
+# --- PESTAÑA 2: MARKETPLACE CON EDICIÓN Y ELIMINACIÓN DE PUBLICACIONES ---
 with pestañas[1]:
     st.markdown('<h3 class="brand-font" style="color:#D81B60;">🛍️ Marketplace Nacional Empoder-Arte</h3>', unsafe_allow_html=True)
     df_prods_todos = cargar_productos()
@@ -1082,14 +1082,44 @@ with pestañas[1]:
                     </div>
                 """, unsafe_allow_html=True)
                 
-                # BOTÓN EXCLUSIVO PARA ELIMINAR PUBLICACIÓN
+                # BOTONES EXCLUSIVOS DE EDICIÓN Y ELIMINACIÓN PARA PROPIETARIA Y ADMINISTRADORA
                 if es_duena_o_admin:
-                    if st.button(f"🗑️ Eliminar Producto", key=f"btn_del_prod_{idx}"):
-                        idx_orig = row["index"] if "index" in row else idx
-                        df_prods_todos = df_prods_todos.drop(index=idx_orig)
-                        guardar_datos(df_prods_todos, ARCHIVO_PRODUCTOS)
-                        st.success("¡Publicación eliminada correctamente!")
-                        st.rerun()
+                    col_b_edit, col_b_del = st.columns(2)
+                    idx_orig = row["index"] if "index" in row else idx
+                    
+                    with col_b_edit:
+                        with st.popover("✏️ Editar"):
+                            st.markdown(f"<b style='color:#D81B60;'>Editar Producto: {row['Producto']}</b>", unsafe_allow_html=True)
+                            with st.form(f"form_edit_prod_{idx}"):
+                                e_prod_nom = st.text_input("Nombre", value=row['Producto'])
+                                e_prod_prec = st.number_input("Precio ($ MXN)", min_value=1.0, value=float(row['Precio']), step=10.0)
+                                e_prod_cat = st.selectbox("Categoría", LISTA_PRODUCTOS, index=LISTA_PRODUCTOS.index(row['Categoria']) if row['Categoria'] in LISTA_PRODUCTOS else 0)
+                                e_prod_est = st.selectbox("Estado", ESTADOS_MEXICO, index=ESTADOS_MEXICO.index(row['Estado']) if row['Estado'] in ESTADOS_MEXICO else 0)
+                                e_prod_stock = st.number_input("Stock", min_value=0, value=int(row['Stock']), step=1)
+                                e_prod_foto = st.file_uploader("Cambiar Imagen del Producto", type=["jpg", "png", "jpeg", "webp"], key=f"e_foto_p_{idx}")
+                                
+                                btn_save_p_edit = st.form_submit_button("💾 Guardar Cambios")
+                                
+                                if btn_save_p_edit:
+                                    df_prods_todos.loc[idx_orig, "Producto"] = e_prod_nom
+                                    df_prods_todos.loc[idx_orig, "Precio"] = float(e_prod_prec)
+                                    df_prods_todos.loc[idx_orig, "Categoria"] = e_prod_cat
+                                    df_prods_todos.loc[idx_orig, "Estado"] = e_prod_est
+                                    df_prods_todos.loc[idx_orig, "Stock"] = int(e_prod_stock)
+                                    
+                                    if e_prod_foto is not None:
+                                        df_prods_todos.loc[idx_orig, "Foto_Producto"] = convertir_imagen_a_base64(e_prod_foto)
+                                        
+                                    guardar_datos(df_prods_todos, ARCHIVO_PRODUCTOS)
+                                    st.success("¡Producto actualizado exitosamente!")
+                                    st.rerun()
+
+                    with col_b_del:
+                        if st.button("🗑️️ Eliminar", key=f"btn_del_prod_{idx}"):
+                            df_prods_todos = df_prods_todos.drop(index=idx_orig)
+                            guardar_datos(df_prods_todos, ARCHIVO_PRODUCTOS)
+                            st.success("¡Publicación eliminada correctamente!")
+                            st.rerun()
 
 # --- PESTAÑA 3: MAPA INTERACTIVO NACIONAL ---
 with pestañas[2]:
