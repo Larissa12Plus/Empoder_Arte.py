@@ -1,0 +1,72 @@
+# ===========================================================================
+# .gitignore — Proyecto Empoder-Arte
+# Evita subir al repositorio entornos, temporales, cachés y datos sensibles.
+# ===========================================================================
+
+# --- Entornos virtuales de Python ---
+.venv/
+venv/
+env/
+ENV/
+.python-version
+
+# --- Caché y bytecode de Python ---
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# --- Herramientas y empaquetado ---
+build/
+dist/
+*.egg-info/
+.eggs/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# --- Datos sensibles y secretos ---
+# NUNCA versionar llaves de cifrado ni credenciales.
+secret.key
+*.key
+.env
+.env.*
+credentials.json
+
+# --- Sesiones y datos locales de usuarias (privados) ---
+session.json
+usuarios.json
+
+# --- Bases de datos locales en CSV (datos de la comunidad) ---
+# Descomenta si NO deseas versionar los datos reales de la plataforma.
+# *.csv
+
+# --- Archivos temporales del sistema operativo ---
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+.DS_Store
+*~
+*.tmp
+*.bak
+
+# --- Configuración de editores / IDEs ---
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+
+# --- Streamlit ---
+.streamlit/secrets.toml
+
+# --- Logs ---
+*.log
+logs/
+
+# --- Base de datos local SQLite (se regenera en el servidor) ---
+empoder_arte.db
+*.sqlite
+*.sqlite3
+
+# --- Artefactos internos de workflows / agentes (no son parte de la app) ---
+.agents/
