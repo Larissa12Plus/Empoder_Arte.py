@@ -381,8 +381,8 @@ def cargar_productos():
                           "Estado_Aprobacion", "Estado", "Foto_Producto"]
     try:
         df_p = pd.read_sql("SELECT * FROM productos", db._get_engine())
-        if "id" in df_p.columns:
-            df_p = df_p.drop(columns=["id"])
+        # Se CONSERVA la columna 'id' (PK de Postgres) para poder editar/eliminar
+        # un producto de forma fiable por su id real, no por índice de pandas.
         if df_p.empty:
             return df_base_prods[columnas_esperadas]
         if "Estado_Aprobacion" not in df_p.columns:
@@ -391,7 +391,8 @@ def cargar_productos():
             df_p["Estado"] = "Querétaro"
         if "Foto_Producto" not in df_p.columns:
             df_p["Foto_Producto"] = "https://picsum.photos/300/200"
-        return df_p[columnas_esperadas]
+        cols_salida = (["id"] if "id" in df_p.columns else []) + columnas_esperadas
+        return df_p[cols_salida]
     except Exception:
         return df_base_prods[columnas_esperadas]
 
@@ -1256,15 +1257,18 @@ with pestañas[1]:
                 # BOTONES EXCLUSIVOS DE EDICIÓN Y ELIMINACIÓN PARA PROPIETARIA Y ADMINISTRADORA
                 if es_duena_o_admin:
                     col_b_edit, col_b_del = st.columns(2)
-                    # Identificar la fila REAL en df_prods_todos por contenido (no por índice
-                    # de pandas, que es inestable al venir los datos de Postgres y estar
-                    # filtrados). Se busca por producto + vendedora + precio.
-                    _mask_prod = (
-                        (df_prods_todos["Email_Emprendedora"] == row["Email_Emprendedora"]) &
-                        (df_prods_todos["Producto"] == row["Producto"]) &
-                        (df_prods_todos["Precio"] == row["Precio"])
-                    )
-                    _idxs = df_prods_todos.index[_mask_prod].tolist()
+                    # id REAL del producto en Postgres (si está disponible). Es la forma
+                    # fiable de editar/eliminar; evita depender del índice de pandas.
+                    prod_id = row["id"] if "id" in row and pd.notna(row["id"]) else None
+                    # Índice en df_prods_todos para la ruta de EDICIÓN (que reescribe la tabla).
+                    if prod_id is not None and "id" in df_prods_todos.columns:
+                        _idxs = df_prods_todos.index[df_prods_todos["id"] == prod_id].tolist()
+                    else:
+                        _idxs = df_prods_todos.index[
+                            (df_prods_todos["Email_Emprendedora"] == row["Email_Emprendedora"]) &
+                            (df_prods_todos["Producto"] == row["Producto"]) &
+                            (df_prods_todos["Precio"] == row["Precio"])
+                        ].tolist()
                     idx_orig = _idxs[0] if _idxs else None
                     
                     with col_b_edit:
@@ -1306,15 +1310,25 @@ with pestañas[1]:
 
                     with col_b_del:
                         if st.button("🗑️ Eliminar", key=f"btn_del_prod_{idx}"):
-                            if idx_orig is None:
-                                st.error("No se pudo localizar el producto a eliminar. Recarga la página e intenta de nuevo.")
-                            else:
-                                # Borrar la fila real por su índice en df_prods_todos y reescribir
-                                # la tabla 'productos' en Postgres (guardar_datos es el dispatcher).
+                            borrado_ok = False
+                            if prod_id is not None:
+                                # Ruta fiable: DELETE directo en Postgres por id real.
+                                try:
+                                    borrado_ok = db.eliminar_fila_por_id("productos", prod_id)
+                                except Exception as e:
+                                    st.error("No se pudo eliminar el producto. Verifica tu conexión.")
+                                    print(f"[marketplace] error al eliminar id={prod_id}: {e}")
+                            elif idx_orig is not None:
+                                # Respaldo: quitar la fila y reescribir la tabla completa.
                                 df_prods_todos = df_prods_todos.drop(index=idx_orig).reset_index(drop=True)
                                 guardar_datos(df_prods_todos, ARCHIVO_PRODUCTOS)
+                                borrado_ok = True
+
+                            if borrado_ok:
                                 st.success("¡Publicación eliminada correctamente!")
                                 st.rerun()
+                            elif prod_id is not None:
+                                st.warning("No se encontró el producto (quizá ya fue eliminado). Recarga la página.")
 
 # --- PESTAÑA 3: MAPA INTERACTIVO NACIONAL ---
 with pestañas[2]:

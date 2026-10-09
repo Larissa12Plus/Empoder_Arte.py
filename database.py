@@ -786,6 +786,23 @@ def reemplazar_tabla_desde_df(tabla: str, df) -> None:
         df.to_sql(tabla, conn, if_exists="append", index=False)
 
 
+def eliminar_fila_por_id(tabla: str, fila_id) -> bool:
+    """Elimina UNA fila de 'tabla' por su columna 'id' (PK sustituta de Postgres).
+
+    Forma robusta de borrar un registro sin depender de índices de pandas ni de
+    coincidencias por contenido. 'tabla' debe ser una clave validada de
+    _COLUMNAS_POR_TABLA (conjunto cerrado), así no hay superficie de inyección SQL.
+    Devuelve True si se eliminó una fila.
+    """
+    if tabla not in _COLUMNAS_POR_TABLA:
+        raise ValueError(f"Tabla no permitida para borrado: {tabla!r}")
+    eng = _get_engine()
+    with eng.begin() as conn:
+        # El nombre de tabla sale de una clave validada; el id va parametrizado.
+        res = conn.exec_driver_sql(f'DELETE FROM {tabla} WHERE id = %s', (int(fila_id),))
+        return res.rowcount > 0
+
+
 # ---------------------------------------------------------
 # CRUD DE ANUNCIOS (BANNER DE PUBLICIDAD)
 # ---------------------------------------------------------
