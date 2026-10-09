@@ -135,8 +135,26 @@ def _resolver_db_url():
         return None
 
 
+def _forzar_driver_psycopg2(url):
+    """Normaliza el prefijo de la URL a 'postgresql+psycopg2://' para que
+    SQLAlchemy use psycopg2 (instalado) y NO intente psycopg (v3, ausente,
+    que provoca ModuleNotFoundError: No module named 'psycopg')."""
+    if not url:
+        return url
+    if url.startswith("postgresql+"):
+        return url  # ya trae un driver explícito
+    if url.startswith("postgresql://"):
+        return "postgresql+psycopg2://" + url[len("postgresql://"):]
+    if url.startswith("postgres://"):
+        return "postgresql+psycopg2://" + url[len("postgres://"):]
+    return url
+
+
 # Se expone a nivel de módulo.
-DB_URL = _resolver_db_url()
+# URL para SQLAlchemy (engine): con driver psycopg2 forzado.
+DB_URL = _forzar_driver_psycopg2(_resolver_db_url())
+# URL "cruda" para psycopg2.connect() directo (obtener_conexion), sin el +psycopg2.
+DB_URL_RAW = _resolver_db_url()
 
 
 # ---------------------------------------------------------
@@ -165,13 +183,14 @@ def obtener_conexion():
     """Devuelve una conexión psycopg2 a Postgres con filas tipo dict
     (RealDictCursor). Si DB_URL no está definido o la conexión falla, lanza
     ConnectionError con un mensaje legible (sin stack trace crudo)."""
-    if not DB_URL:
+    if not DB_URL_RAW:
         raise ConnectionError(
             "No se encontró la cadena de conexión a la base de datos (DB_URL). "
             "Configura DB_URL en los secretos de la aplicación."
         )
     try:
-        return psycopg2.connect(DB_URL, cursor_factory=RealDictCursor)
+        # psycopg2.connect NO entiende el prefijo '+psycopg2'; usa la URL cruda.
+        return psycopg2.connect(DB_URL_RAW, cursor_factory=RealDictCursor)
     except psycopg2.Error as exc:
         raise ConnectionError(
             "No fue posible conectar con la base de datos. "
