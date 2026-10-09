@@ -937,24 +937,28 @@ if anuncios_vigentes:
     contenido_anuncio = anuncio_actual.get("contenido") or ""
 
     # Encabezado rosa coherente con la marca (gradiente 135deg #EF289A -> #D81B60).
+    # Banner GRANDE y vistoso: a todo el ancho, encabezado alto y tipografía mayor.
     sub_anunciante = f" · {anunciante_anuncio}" if anunciante_anuncio else ""
     st.markdown(f"""
         <div style="background: linear-gradient(135deg, #EF289A 0%, #D81B60 100%);
-                    padding: 18px 22px; border-radius: 18px; margin-bottom: 14px;
-                    box-shadow: 0 6px 18px rgba(216, 27, 96, 0.25);">
-            <h3 class="brand-font" style="color:white; margin:0; font-size:24px;
-                       text-shadow: 1px 1px 3px rgba(0,0,0,0.2);">📢 {titulo_anuncio}</h3>
-            <p style="color:#FFE0B2; margin:4px 0 0 0; font-size:13px; font-weight:bold;
-                      letter-spacing:1px;">PUBLICIDAD{sub_anunciante}</p>
+                    padding: 34px 32px; border-radius: 22px; margin-bottom: 20px;
+                    border: 3px solid #FFFFFF;
+                    box-shadow: 0 12px 32px rgba(216, 27, 96, 0.38);">
+            <p style="color:#FFE0B2; margin:0 0 6px 0; font-size:14px; font-weight:bold;
+                      letter-spacing:3px;">★ PUBLICIDAD{sub_anunciante} ★</p>
+            <h2 class="brand-font" style="color:white; margin:0; font-size:40px; line-height:1.1;
+                       text-shadow: 2px 2px 5px rgba(0,0,0,0.28);">📢 {titulo_anuncio}</h2>
         </div>
     """, unsafe_allow_html=True)
 
     if tipo_anuncio == "imagen" and contenido_anuncio:
         # La imagen llega como data URI base64 (data:image/...;base64,...).
+        # Banner ancho y alto para máxima visibilidad en la portada.
         st.markdown(
             f'<img src="{contenido_anuncio}" alt="{titulo_anuncio}" '
-            'style="width:100%; border-radius:14px; margin-bottom:16px; '
-            'box-shadow: 0 4px 14px rgba(216, 27, 96, 0.18);">',
+            'style="width:100%; max-height:620px; object-fit:cover; display:block; '
+            'border-radius:20px; margin-bottom:22px; border: 3px solid #F8BBD0; '
+            'box-shadow: 0 10px 28px rgba(216, 27, 96, 0.30);">',
             unsafe_allow_html=True,
         )
     elif tipo_anuncio == "video" and contenido_anuncio:
@@ -975,11 +979,14 @@ if anuncios_vigentes:
 elif st.session_state.get("es_admin"):
     # Sin anuncios vigentes: placeholder discreto solo visible para la administradora.
     st.markdown("""
-        <div style="border: 2px dashed #EF289A; border-radius: 14px; padding: 14px 20px;
-                    margin-bottom: 14px; text-align:center; background-color: #FFF0F5;">
-            <span style="color:#D81B60; font-weight:bold; font-size:14px;">
-                📢 Espacio publicitario disponible — $59/semana
+        <div style="border: 3px dashed #EF289A; border-radius: 20px; padding: 40px 24px;
+                    margin-bottom: 20px; text-align:center; background-color: #FFF0F5;">
+            <div style="font-size:38px; margin-bottom:6px;">📢</div>
+            <span style="color:#D81B60; font-weight:bold; font-size:22px;" class="brand-font">
+                Espacio publicitario disponible
             </span>
+            <p style="color:#D81B60; margin:8px 0 0 0; font-size:16px; font-weight:bold;
+                      letter-spacing:1px;">Promociona tu marca aquí · $59 / semana</p>
         </div>
     """, unsafe_allow_html=True)
 
