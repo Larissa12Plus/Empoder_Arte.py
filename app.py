@@ -22,6 +22,7 @@ import json
 import hashlib
 import subprocess
 import random
+import time
 from io import BytesIO
 from datetime import datetime, date, timedelta
 from PIL import Image
@@ -910,6 +911,74 @@ titulos_pestañas = [
 titulos_pestañas.append("👑 Zona VIP / Exclusivo")
 if st.session_state["es_admin"]:
     titulos_pestañas.append("📊 Dashboard Admin")  # ahora índice 9 (solo admin)
+
+# ---------------------------------------------------------
+# BANNER PUBLICITARIO DE ENTRADA (visible para TODAS las visitantes)
+# Se renderiza después del versículo y antes de las pestañas principales.
+# ---------------------------------------------------------
+try:
+    anuncios_vigentes = db.obtener_anuncios_vigentes()
+except Exception:
+    # Si la BD falla al leer anuncios, no romper la portada: simplemente no mostrar banner.
+    anuncios_vigentes = []
+
+if anuncios_vigentes:
+    # ROTACIÓN por índice temporal: rota cada minuto para dar exposición equitativa
+    # a cada anunciante en cada carga de la portada.
+    idx_anuncio = int(time.time() // 60) % len(anuncios_vigentes)
+    anuncio_actual = anuncios_vigentes[idx_anuncio]
+
+    titulo_anuncio = anuncio_actual.get("titulo") or ""
+    anunciante_anuncio = anuncio_actual.get("anunciante") or ""
+    tipo_anuncio = anuncio_actual.get("tipo") or ""
+    contenido_anuncio = anuncio_actual.get("contenido") or ""
+
+    # Encabezado rosa coherente con la marca (gradiente 135deg #EF289A -> #D81B60).
+    sub_anunciante = f" · {anunciante_anuncio}" if anunciante_anuncio else ""
+    st.markdown(f"""
+        <div style="background: linear-gradient(135deg, #EF289A 0%, #D81B60 100%);
+                    padding: 18px 22px; border-radius: 18px; margin-bottom: 14px;
+                    box-shadow: 0 6px 18px rgba(216, 27, 96, 0.25);">
+            <h3 class="brand-font" style="color:white; margin:0; font-size:24px;
+                       text-shadow: 1px 1px 3px rgba(0,0,0,0.2);">📢 {titulo_anuncio}</h3>
+            <p style="color:#FFE0B2; margin:4px 0 0 0; font-size:13px; font-weight:bold;
+                      letter-spacing:1px;">PUBLICIDAD{sub_anunciante}</p>
+        </div>
+    """, unsafe_allow_html=True)
+
+    if tipo_anuncio == "imagen" and contenido_anuncio:
+        # La imagen llega como data URI base64 (data:image/...;base64,...).
+        st.markdown(
+            f'<img src="{contenido_anuncio}" alt="{titulo_anuncio}" '
+            'style="width:100%; border-radius:14px; margin-bottom:16px; '
+            'box-shadow: 0 4px 14px rgba(216, 27, 96, 0.18);">',
+            unsafe_allow_html=True,
+        )
+    elif tipo_anuncio == "video" and contenido_anuncio:
+        # Video por URL (YouTube/Vimeo). st.video acepta esas URLs directamente.
+        try:
+            st.video(contenido_anuncio)
+        except Exception:
+            # Respaldo responsive por iframe si st.video no pudiera reproducir la URL.
+            st.markdown(
+                '<div style="position:relative; padding-bottom:56.25%; height:0; '
+                'overflow:hidden; border-radius:14px; margin-bottom:16px;">'
+                f'<iframe src="{contenido_anuncio}" frameborder="0" allowfullscreen '
+                'style="position:absolute; top:0; left:0; width:100%; height:100%;"></iframe>'
+                '</div>',
+                unsafe_allow_html=True,
+            )
+        st.markdown('<div style="margin-bottom:16px;"></div>', unsafe_allow_html=True)
+elif st.session_state.get("es_admin"):
+    # Sin anuncios vigentes: placeholder discreto solo visible para la administradora.
+    st.markdown("""
+        <div style="border: 2px dashed #EF289A; border-radius: 14px; padding: 14px 20px;
+                    margin-bottom: 14px; text-align:center; background-color: #FFF0F5;">
+            <span style="color:#D81B60; font-weight:bold; font-size:14px;">
+                📢 Espacio publicitario disponible — $59/semana
+            </span>
+        </div>
+    """, unsafe_allow_html=True)
 
 pestañas = st.tabs(titulos_pestañas)
 
@@ -2046,13 +2115,14 @@ if st.session_state["es_admin"]:
         st.markdown('<h3 class="brand-font" style="color:#D81B60;">👑 Módulo Exclusivo de Aprobación, Seguridad y Gestión de Usuarios (Fundadora)</h3>', unsafe_allow_html=True)
         st.write("Bienvenida, Larissa. Desde este panel tienes control total sobre los usuarios, asignación de roles, bajas, eliminación definitiva y reseteo de contraseñas.")
         
-        t_admin_ver, t_admin_ctrl, t_admin_new, t_admin_reset, t_admin_del, t_admin_subs = st.tabs([
+        t_admin_ver, t_admin_ctrl, t_admin_new, t_admin_reset, t_admin_del, t_admin_subs, t_admin_pub = st.tabs([
             "🔍 Verificación & Cifrado (CURP/INE)",
             "⚙️ Control de Roles y Bajas",
             "➕ Registrar Usuario VIP / Admin",
             "🔑 Reseteo de Contraseñas",
             "🔥 Eliminación Definitiva",
-            "💳 Gestión de Suscripciones"
+            "💳 Gestión de Suscripciones",
+            "📢 Publicidad / Banners"
         ])
         
         usuarios_db = cargar_usuarios_db()
@@ -2190,6 +2260,123 @@ if st.session_state["es_admin"]:
                         st.rerun()
                     else:
                         st.warning("No se pudo activar el VIP.")
+
+        # SUBPESTAÑA 7: PUBLICIDAD / BANNERS (gestión de anuncios de la portada)
+        with t_admin_pub:
+            st.markdown("<h4 class='brand-font' style='color:#D81B60;'>📢 Publicidad / Banners de Entrada</h4>", unsafe_allow_html=True)
+            st.info("💲 Precio de referencia: **$59/semana** por banner (imagen o video). El cobro se realiza por fuera; aquí programas las fechas y el banner se activa y rota solo.")
+
+            # --- FORMULARIO DE ALTA DE ANUNCIO ---
+            with st.form("form_alta_anuncio"):
+                an_titulo = st.text_input("Título del anuncio:")
+                an_anunciante = st.text_input("Anunciante (opcional):")
+                an_tipo = st.radio("Tipo de banner:", ["imagen", "video"], horizontal=True)
+                an_foto_file = None
+                an_video_url = ""
+                if an_tipo == "imagen":
+                    an_foto_file = st.file_uploader("Imagen del banner (JPG/PNG):", type=["jpg", "jpeg", "png"], key="file_banner_pub")
+                else:
+                    an_video_url = st.text_input("URL del video (YouTube/Vimeo):").strip()
+                col_f1, col_f2 = st.columns(2)
+                with col_f1:
+                    an_fecha_inicio = st.date_input("Fecha de inicio:", value=date.today(), key="date_ini_banner")
+                with col_f2:
+                    an_fecha_fin = st.date_input("Fecha de fin:", value=date.today() + timedelta(days=7), key="date_fin_banner")
+                btn_crear_anuncio = st.form_submit_button("📢 Programar banner ($59/semana)")
+
+                if btn_crear_anuncio:
+                    # Validaciones mínimas antes de insertar en la BD.
+                    if not an_titulo:
+                        st.error("El título es obligatorio.")
+                    elif an_fecha_fin < an_fecha_inicio:
+                        st.error("La fecha de fin no puede ser anterior a la de inicio.")
+                    else:
+                        # Resolver el contenido según el tipo: imagen -> data URI base64; video -> URL.
+                        if an_tipo == "imagen":
+                            if an_foto_file is None:
+                                contenido_nuevo = None
+                            else:
+                                contenido_nuevo = convertir_imagen_a_base64(an_foto_file)
+                        else:
+                            contenido_nuevo = an_video_url or None
+
+                        if not contenido_nuevo:
+                            st.error("Debes subir una imagen o proporcionar la URL del video.")
+                        else:
+                            try:
+                                db.crear_anuncio(
+                                    titulo=an_titulo,
+                                    tipo=an_tipo,
+                                    contenido=contenido_nuevo,
+                                    fecha_inicio=an_fecha_inicio.strftime("%Y-%m-%d"),
+                                    fecha_fin=an_fecha_fin.strftime("%Y-%m-%d"),
+                                    anunciante=an_anunciante,
+                                )
+                                st.success("¡Banner programado correctamente!")
+                                st.rerun()
+                            except Exception as e:
+                                st.error("No se pudo guardar el banner. Intenta de nuevo.")
+                                print(f"[anuncios] Error al crear anuncio: {e}")
+
+            st.write("---")
+
+            # --- LISTADO DE ANUNCIOS CON ESTADO POR FECHA Y ACCIONES ---
+            st.markdown("<h5 class='brand-font' style='color:#D81B60;'>📋 Banners programados</h5>", unsafe_allow_html=True)
+            try:
+                lista_anuncios = db.listar_anuncios()
+            except Exception as e:
+                lista_anuncios = []
+                st.error("No se pudieron cargar los anuncios.")
+                print(f"[anuncios] Error al listar anuncios: {e}")
+
+            if not lista_anuncios:
+                st.info("Aún no hay banners programados.")
+            else:
+                hoy = date.today()
+                for an in lista_anuncios:
+                    an_id = an.get("id")
+                    f_ini = an.get("fecha_inicio")
+                    f_fin = an.get("fecha_fin")
+                    activo = an.get("activo", True)
+
+                    # Normalizar fechas (llegan como datetime.date desde Postgres).
+                    f_ini_d = f_ini if isinstance(f_ini, date) else None
+                    f_fin_d = f_fin if isinstance(f_fin, date) else None
+
+                    # Estado calculado por la fecha de HOY.
+                    if not activo:
+                        estado_txt = "⛔ Inactivo"
+                    elif f_ini_d and hoy < f_ini_d:
+                        estado_txt = "🗓️ Programado"
+                    elif f_fin_d and hoy > f_fin_d:
+                        estado_txt = "⌛ Vencido"
+                    else:
+                        estado_txt = "✅ Vigente"
+
+                    with st.container():
+                        st.markdown(
+                            f"**{an.get('titulo', '(sin título)')}** · _{an.get('tipo', '')}_"
+                            f"{(' · ' + an.get('anunciante')) if an.get('anunciante') else ''}"
+                        )
+                        st.caption(
+                            f"Vigencia: {f_ini_d or f_ini} → {f_fin_d or f_fin}  |  Estado: {estado_txt}  |  $59/semana"
+                        )
+                        col_a1, col_a2, col_a3 = st.columns(3)
+                        with col_a1:
+                            if activo:
+                                if st.button("⏸️ Desactivar", key=f"btn_desact_an_{an_id}"):
+                                    db.activar_desactivar_anuncio(an_id, False)
+                                    st.rerun()
+                            else:
+                                if st.button("▶️ Activar", key=f"btn_act_an_{an_id}"):
+                                    db.activar_desactivar_anuncio(an_id, True)
+                                    st.rerun()
+                        with col_a3:
+                            if st.button("🗑️ Eliminar", key=f"btn_del_an_{an_id}"):
+                                db.eliminar_anuncio(an_id)
+                                st.rerun()
+                        st.write("---")
+
                     # =============================================================================
 # MÓDULO DE CONTROL DE SUSCRIPCIONES Y BLOQUEO DE FUNCIONALIDADES VIP (30 DÍAS)
 # =============================================================================
