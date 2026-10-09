@@ -2,30 +2,44 @@
 =============================================================================
 PROYECTO: EMPODER-ARTE
 ARCHIVO: database.py
-DESCRIPCIÓN: Capa de base de datos SQLite para la plataforma Empoder-Arte.
-             Gestiona dos tipos de usuarios (emprendedora / cliente), rastrea
-             sus suscripciones (Gratuito / VIP) y controla el acceso al
-             contenido VIP según el estado y la fecha de vencimiento del pago.
+DESCRIPCIÓN: Capa de base de datos PostgreSQL (Supabase) para la plataforma
+             Empoder-Arte. Gestiona dos tipos de usuarios (emprendedora /
+             cliente), rastrea sus suscripciones (Gratuito / VIP) y controla
+             el acceso al contenido VIP según el estado y la fecha de
+             vencimiento del pago.
 
              Expone funciones auxiliares para:
-               - Inicializar el esquema de la base de datos.
+               - Inicializar el esquema de la base de datos (14 tablas).
                - Registrar usuarios creando automáticamente su suscripción base.
                - Verificar credenciales de inicio de sesión.
                - Consultar el estado de suscripción por email o por id.
                - Actualizar el estado de suscripción (activar tras pago,
                  cortar acceso si está vencida, etc.).
                - Soporte para el panel de administración (listar y editar).
+               - Reemplazo masivo de tablas tabulares desde un DataFrame.
+               - CRUD de la tabla de anuncios (banner de publicidad).
+
+             IMPLEMENTACIÓN:
+               - psycopg2 (RealDictCursor) para DDL y escrituras parametrizadas.
+               - SQLAlchemy (engine cacheado) sólo como conexión para pandas
+                 (read_sql / to_sql) en el reemplazo de tablas.
 =============================================================================
 """
 
 import os
-import sqlite3
 import hashlib
 from datetime import datetime, date, timedelta
+
+import psycopg2
+import psycopg2.errors
+from psycopg2.extras import RealDictCursor
+from sqlalchemy import create_engine
 
 # ---------------------------------------------------------
 # CONFIGURACIÓN GENERAL
 # ---------------------------------------------------------
+# NOMBRE_DB se conserva (ya no se usa para conectar aquí, pero el script de
+# migración lo necesita para localizar el SQLite origen).
 NOMBRE_DB = "empoder_arte.db"
 
 # Datos de la administradora / fundadora (único usuario inicial)
@@ -43,15 +57,83 @@ DIAS_VIGENCIA_VIP = 30
 
 
 # ---------------------------------------------------------
+# RESOLUCIÓN DE LA CADENA DE CONEXIÓN (DB_URL)
+# ---------------------------------------------------------
+def _resolver_db_url():
+    """Resuelve la cadena de conexión a Postgres con PRECEDENCIA FIJA:
+
+      1) Variable de entorno DB_URL (script standalone / CI).
+      2) st.secrets['DB_URL'] (cuando corre dentro de Streamlit).
+      3) Parseo directo de .streamlit/secrets.toml con tomllib (stdlib 3.11+).
+
+    Devuelve la cadena o None si no se encontró en ninguna fuente.
+    La contraseña NUNCA se hardcodea: siempre proviene de una de estas fuentes.
+    """
+    # 1) Variable de entorno
+    url = os.environ.get("DB_URL")
+    if url:
+        return url
+
+    # 2) Secrets de Streamlit (sólo disponible dentro de la app)
+    try:
+        import streamlit as st
+        if "DB_URL" in st.secrets:
+            return st.secrets["DB_URL"]
+    except Exception:
+        pass
+
+    # 3) Último recurso: parsear .streamlit/secrets.toml (hermano de este archivo)
+    try:
+        import tomllib
+        ruta = os.path.join(os.path.dirname(__file__), ".streamlit", "secrets.toml")
+        with open(ruta, "rb") as f:
+            return tomllib.load(f).get("DB_URL")
+    except Exception:
+        return None
+
+
+# Se expone a nivel de módulo.
+DB_URL = _resolver_db_url()
+
+
+# ---------------------------------------------------------
 # CONEXIÓN
 # ---------------------------------------------------------
-def obtener_conexion() -> sqlite3.Connection:
-    """Devuelve una conexión a SQLite con claves foráneas activadas y
-    acceso a las filas por nombre de columna (sqlite3.Row)."""
-    conn = sqlite3.connect(NOMBRE_DB)
-    conn.row_factory = sqlite3.Row
-    conn.execute("PRAGMA foreign_keys = ON;")
-    return conn
+# Engine SQLAlchemy cacheado a nivel de módulo (lo usan las lecturas pandas y
+# el reemplazo de tablas). Se crea una sola vez.
+_ENGINE = None
+
+
+def _get_engine():
+    """Crea (una sola vez) y devuelve un engine de SQLAlchemy cacheado.
+    Lo reutilizan las lecturas de pandas y reemplazar_tabla_desde_df."""
+    global _ENGINE
+    if _ENGINE is None:
+        if not DB_URL:
+            raise ConnectionError(
+                "No se encontró la cadena de conexión a la base de datos (DB_URL). "
+                "Configura DB_URL en los secretos de la aplicación."
+            )
+        _ENGINE = create_engine(DB_URL, pool_pre_ping=True)
+    return _ENGINE
+
+
+def obtener_conexion():
+    """Devuelve una conexión psycopg2 a Postgres con filas tipo dict
+    (RealDictCursor). Si DB_URL no está definido o la conexión falla, lanza
+    ConnectionError con un mensaje legible (sin stack trace crudo)."""
+    if not DB_URL:
+        raise ConnectionError(
+            "No se encontró la cadena de conexión a la base de datos (DB_URL). "
+            "Configura DB_URL en los secretos de la aplicación."
+        )
+    try:
+        return psycopg2.connect(DB_URL, cursor_factory=RealDictCursor)
+    except psycopg2.Error as exc:
+        raise ConnectionError(
+            "No fue posible conectar con la base de datos. "
+            "Verifica tu conexión e inténtalo de nuevo."
+        ) from exc
 
 
 # ---------------------------------------------------------
@@ -63,47 +145,220 @@ def generar_hash(password: str) -> str:
 
 
 # ---------------------------------------------------------
-# INICIALIZACIÓN DEL ESQUEMA
+# INICIALIZACIÓN DEL ESQUEMA (14 TABLAS, DDL IDEMPOTENTE Y TRANSACCIONAL)
 # ---------------------------------------------------------
+# Cada sentencia es CREATE TABLE IF NOT EXISTS, por lo que es segura de
+# re-ejecutar. Los identificadores con mayúscula (nombres reales del CSV) van
+# entrecomillados con comillas dobles. Todo el DDL se emite en UNA sola
+# transacción: un único commit al final o rollback + ConnectionError si falla.
+_DDL_TABLAS = (
+    # (1) usuarios --------------------------------------------------------
+    """
+    CREATE TABLE IF NOT EXISTS usuarios (
+        id              INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+        nombre          TEXT NOT NULL,
+        email           TEXT NOT NULL UNIQUE,
+        password_hash   TEXT NOT NULL,
+        tipo_usuario    TEXT NOT NULL CHECK (tipo_usuario IN ('emprendedora', 'cliente', 'admin')),
+        fecha_registro  TEXT NOT NULL
+    );
+    """,
+    # (2) suscripciones ---------------------------------------------------
+    """
+    CREATE TABLE IF NOT EXISTS suscripciones (
+        id                 INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+        usuario_id         INTEGER NOT NULL REFERENCES usuarios(id) ON DELETE CASCADE,
+        plan               TEXT NOT NULL CHECK (plan IN ('Gratuito', 'VIP')),
+        estado             TEXT NOT NULL CHECK (estado IN ('activo', 'inactivo', 'pendiente')),
+        fecha_inicio       TEXT,
+        fecha_vencimiento  TEXT
+    );
+    """,
+    # (3) emprendedoras (22 columnas de datos con nombres reales) ---------
+    """
+    CREATE TABLE IF NOT EXISTS emprendedoras (
+        id                   INTEGER GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+        "Email"              TEXT UNIQUE,
+        "Nombre"             TEXT,
+        "Negocio"            TEXT,
+        "Tipo_Oferta"        TEXT,
+        "Categoria"          TEXT,
+        "WhatsApp"           TEXT,
+        "Descripcion"        TEXT,
+        "Estado_Pago"        TEXT,
+        "Metodo_Pago"        TEXT,
+        "Contacto"           TEXT,
+        "Estado_Aprobacion"  TEXT,
+        "Estado"             TEXT,
+        "Ciudad"             TEXT,
+        "Colonia"            TEXT,
+        "lat"                TEXT,
+        "lon"                TEXT,
+        "Celular"            TEXT,
+        "INE_Doc"            TEXT,
+        "CURP_Doc"           TEXT,
+        "Historia"           TEXT,
+        "CURP_Valor"         TEXT,
+        "Foto_Perfil"        TEXT
+    );
+    """,
+    'CREATE UNIQUE INDEX IF NOT EXISTS ux_emprendedoras_email ON emprendedoras ("Email");',
+    # (4) productos -------------------------------------------------------
+    """
+    CREATE TABLE IF NOT EXISTS productos (
+        id                   INTEGER GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+        "Email_Emprendedora" TEXT,
+        "Producto"           TEXT,
+        "Precio"             NUMERIC,
+        "Categoria"          TEXT,
+        "Stock"              TEXT,
+        "Estado_Aprobacion"  TEXT,
+        "Estado"             TEXT,
+        "Foto_Producto"      TEXT
+    );
+    """,
+    # (5) finanzas --------------------------------------------------------
+    """
+    CREATE TABLE IF NOT EXISTS finanzas (
+        id                   INTEGER GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+        "Fecha"              TEXT,
+        "Email_Emprendedora" TEXT,
+        "Cliente"            TEXT,
+        "Concepto"           TEXT,
+        "Monto"              NUMERIC,
+        "Tipo"               TEXT
+    );
+    """,
+    # (6) agenda ----------------------------------------------------------
+    """
+    CREATE TABLE IF NOT EXISTS agenda (
+        id                   INTEGER GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+        "Email_Emprendedora" TEXT,
+        "Fecha"              TEXT,
+        "Hora"               TEXT,
+        "Evento"             TEXT,
+        "Cliente_Contacto"   TEXT,
+        "Notas"              TEXT
+    );
+    """,
+    # (7) tareas ----------------------------------------------------------
+    """
+    CREATE TABLE IF NOT EXISTS tareas (
+        id                   INTEGER GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+        "Email_Emprendedora" TEXT,
+        "Tarea"              TEXT,
+        "Prioridad"          TEXT,
+        "Estatus"            TEXT
+    );
+    """,
+    # (8) evaluaciones ----------------------------------------------------
+    """
+    CREATE TABLE IF NOT EXISTS evaluaciones (
+        id              INTEGER GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+        "Fecha"         TEXT,
+        "Email_Destino" TEXT,
+        "Autor_Email"   TEXT,
+        "Autor_Nombre"  TEXT,
+        "Calificacion"  TEXT,
+        "Comentario"    TEXT
+    );
+    """,
+    # (9) oraciones -------------------------------------------------------
+    """
+    CREATE TABLE IF NOT EXISTS oraciones (
+        id          INTEGER GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+        "Fecha"     TEXT,
+        "Nombre"    TEXT,
+        "Email"     TEXT,
+        "Celular"   TEXT,
+        "Area"      TEXT,
+        "Peticion"  TEXT,
+        "Privada"   TEXT
+    );
+    """,
+    # (10) lives_grabados -------------------------------------------------
+    """
+    CREATE TABLE IF NOT EXISTS lives_grabados (
+        id                    INTEGER GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+        "Fecha_Emision"       TEXT,
+        "Email_Emprendedora"  TEXT,
+        "Nombre_Emprendedora" TEXT,
+        "Titulo_Live"         TEXT,
+        "Frame_B64"           TEXT
+    );
+    """,
+    # (11) chat_live ------------------------------------------------------
+    """
+    CREATE TABLE IF NOT EXISTS chat_live (
+        id         INTEGER GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+        "Hora"     TEXT,
+        "Usuario"  TEXT,
+        "Mensaje"  TEXT
+    );
+    """,
+    # (12) publicaciones_muro --------------------------------------------
+    """
+    CREATE TABLE IF NOT EXISTS publicaciones_muro (
+        id        INTEGER GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+        "Email"   TEXT,
+        "Nombre"  TEXT,
+        "Fecha"   TEXT,
+        "Texto"   TEXT
+    );
+    """,
+    # (13) clientes -------------------------------------------------------
+    """
+    CREATE TABLE IF NOT EXISTS clientes (
+        id                   INTEGER GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+        "Email_Emprendedora" TEXT,
+        "Nombre_Cliente"     TEXT,
+        "Telefono"           TEXT,
+        "Notas"              TEXT
+    );
+    """,
+    # (14) anuncios (banner de publicidad) --------------------------------
+    """
+    CREATE TABLE IF NOT EXISTS anuncios (
+        id             INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+        titulo         TEXT,
+        tipo           TEXT CHECK (tipo IN ('imagen', 'video')),
+        contenido      TEXT,
+        fecha_inicio   DATE,
+        fecha_fin      DATE,
+        activo         BOOLEAN DEFAULT true,
+        fecha_creacion TEXT,
+        precio         NUMERIC DEFAULT 59,
+        anunciante     TEXT
+    );
+    """,
+)
+
+
 def inicializar_db():
-    """Crea las tablas 'usuarios' y 'suscripciones' si no existen y asegura
-    que la administradora fundadora quede registrada con suscripción VIP activa."""
+    """Crea las 14 tablas si no existen (DDL idempotente) dentro de UNA sola
+    transacción, y asegura que la administradora fundadora quede registrada
+    con suscripción VIP activa.
+
+    Si cualquier sentencia DDL falla, se hace rollback y se re-lanza como
+    ConnectionError para que la capa de la app muestre un error claro."""
     conn = obtener_conexion()
-    cur = conn.cursor()
+    try:
+        conn.autocommit = False
+        cur = conn.cursor()
+        for ddl in _DDL_TABLAS:
+            cur.execute(ddl)
+        conn.commit()
+    except Exception as exc:
+        conn.rollback()
+        raise ConnectionError(
+            "No fue posible inicializar la base de datos. "
+            "Verifica tu conexión e inténtalo de nuevo."
+        ) from exc
+    finally:
+        conn.close()
 
-    # --- Tabla de usuarios ---
-    cur.execute(
-        """
-        CREATE TABLE IF NOT EXISTS usuarios (
-            id              INTEGER PRIMARY KEY AUTOINCREMENT,
-            nombre          TEXT    NOT NULL,
-            email           TEXT    NOT NULL UNIQUE,
-            password_hash   TEXT    NOT NULL,
-            tipo_usuario    TEXT    NOT NULL CHECK (tipo_usuario IN ('emprendedora', 'cliente', 'admin')),
-            fecha_registro  TEXT    NOT NULL
-        );
-        """
-    )
-
-    # --- Tabla de suscripciones (1 usuario -> N suscripciones; la vigente es la última) ---
-    cur.execute(
-        """
-        CREATE TABLE IF NOT EXISTS suscripciones (
-            id                 INTEGER PRIMARY KEY AUTOINCREMENT,
-            usuario_id         INTEGER NOT NULL,
-            plan               TEXT    NOT NULL CHECK (plan IN ('Gratuito', 'VIP')),
-            estado             TEXT    NOT NULL CHECK (estado IN ('activo', 'inactivo', 'pendiente')),
-            fecha_inicio       TEXT,
-            fecha_vencimiento  TEXT,
-            FOREIGN KEY (usuario_id) REFERENCES usuarios (id) ON DELETE CASCADE
-        );
-        """
-    )
-
-    conn.commit()
-    conn.close()
-
-    # Asegura la cuenta de la fundadora como admin con VIP activo.
+    # Asegura la cuenta de la fundadora como admin con VIP activo (gestiona su
+    # propia transacción; corre después del commit del DDL).
     _asegurar_admin()
 
 
@@ -168,11 +423,12 @@ def registrar_usuario(
         cur.execute(
             """
             INSERT INTO usuarios (nombre, email, password_hash, tipo_usuario, fecha_registro)
-            VALUES (?, ?, ?, ?, ?);
+            VALUES (%s, %s, %s, %s, %s)
+            RETURNING id;
             """,
             (nombre, email, generar_hash(password), tipo_usuario, fecha_registro),
         )
-        usuario_id = cur.lastrowid
+        usuario_id = cur.fetchone()["id"]
 
         # Fechas de la suscripción base.
         fecha_inicio = date.today().strftime("%Y-%m-%d")
@@ -184,7 +440,7 @@ def registrar_usuario(
         cur.execute(
             """
             INSERT INTO suscripciones (usuario_id, plan, estado, fecha_inicio, fecha_vencimiento)
-            VALUES (?, ?, ?, ?, ?);
+            VALUES (%s, %s, %s, %s, %s);
             """,
             (usuario_id, plan, estado, fecha_inicio, fecha_vencimiento),
         )
@@ -192,7 +448,8 @@ def registrar_usuario(
         conn.commit()
         return {"ok": True, "mensaje": "Usuario registrado correctamente.", "usuario_id": usuario_id}
 
-    except sqlite3.IntegrityError:
+    except psycopg2.errors.UniqueViolation:
+        conn.rollback()
         return {"ok": False, "mensaje": "Ya existe un usuario con ese correo electrónico.", "usuario_id": None}
     finally:
         conn.close()
@@ -205,20 +462,24 @@ def obtener_usuario_por_email(email: str):
     """Devuelve el registro del usuario (dict) o None si no existe."""
     email = (email or "").strip().lower()
     conn = obtener_conexion()
-    cur = conn.cursor()
-    cur.execute("SELECT * FROM usuarios WHERE email = ?;", (email,))
-    fila = cur.fetchone()
-    conn.close()
+    try:
+        cur = conn.cursor()
+        cur.execute("SELECT * FROM usuarios WHERE email = %s;", (email,))
+        fila = cur.fetchone()
+    finally:
+        conn.close()
     return dict(fila) if fila else None
 
 
 def obtener_usuario_por_id(usuario_id: int):
     """Devuelve el registro del usuario (dict) por id, o None si no existe."""
     conn = obtener_conexion()
-    cur = conn.cursor()
-    cur.execute("SELECT * FROM usuarios WHERE id = ?;", (usuario_id,))
-    fila = cur.fetchone()
-    conn.close()
+    try:
+        cur = conn.cursor()
+        cur.execute("SELECT * FROM usuarios WHERE id = %s;", (usuario_id,))
+        fila = cur.fetchone()
+    finally:
+        conn.close()
     return dict(fila) if fila else None
 
 
@@ -250,18 +511,20 @@ def verificar_credenciales(email: str, password: str):
 def obtener_suscripcion_por_id(usuario_id: int):
     """Devuelve la suscripción más reciente de un usuario (dict) o None."""
     conn = obtener_conexion()
-    cur = conn.cursor()
-    cur.execute(
-        """
-        SELECT * FROM suscripciones
-        WHERE usuario_id = ?
-        ORDER BY id DESC
-        LIMIT 1;
-        """,
-        (usuario_id,),
-    )
-    fila = cur.fetchone()
-    conn.close()
+    try:
+        cur = conn.cursor()
+        cur.execute(
+            """
+            SELECT * FROM suscripciones
+            WHERE usuario_id = %s
+            ORDER BY id DESC
+            LIMIT 1;
+            """,
+            (usuario_id,),
+        )
+        fila = cur.fetchone()
+    finally:
+        conn.close()
     return dict(fila) if fila else None
 
 
@@ -334,13 +597,15 @@ def actualizar_estado_suscripcion(usuario_id: int, nuevo_estado: str) -> bool:
         return False
 
     conn = obtener_conexion()
-    cur = conn.cursor()
-    cur.execute(
-        "UPDATE suscripciones SET estado = ? WHERE id = ?;",
-        (nuevo_estado, suscripcion["id"]),
-    )
-    conn.commit()
-    conn.close()
+    try:
+        cur = conn.cursor()
+        cur.execute(
+            "UPDATE suscripciones SET estado = %s WHERE id = %s;",
+            (nuevo_estado, suscripcion["id"]),
+        )
+        conn.commit()
+    finally:
+        conn.close()
     return True
 
 
@@ -355,17 +620,19 @@ def activar_suscripcion_vip(usuario_id: int, dias_vigencia: int = DIAS_VIGENCIA_
     fecha_vencimiento = (date.today() + timedelta(days=dias_vigencia)).strftime("%Y-%m-%d")
 
     conn = obtener_conexion()
-    cur = conn.cursor()
-    cur.execute(
-        """
-        UPDATE suscripciones
-        SET plan = 'VIP', estado = 'activo', fecha_inicio = ?, fecha_vencimiento = ?
-        WHERE id = ?;
-        """,
-        (fecha_inicio, fecha_vencimiento, suscripcion["id"]),
-    )
-    conn.commit()
-    conn.close()
+    try:
+        cur = conn.cursor()
+        cur.execute(
+            """
+            UPDATE suscripciones
+            SET plan = 'VIP', estado = 'activo', fecha_inicio = %s, fecha_vencimiento = %s
+            WHERE id = %s;
+            """,
+            (fecha_inicio, fecha_vencimiento, suscripcion["id"]),
+        )
+        conn.commit()
+    finally:
+        conn.close()
     return True
 
 
@@ -380,47 +647,222 @@ def listar_usuarios_con_suscripcion(tipo_usuario: str = None) -> list:
     filtra solo ese tipo.
     """
     conn = obtener_conexion()
-    cur = conn.cursor()
+    try:
+        cur = conn.cursor()
 
-    consulta = """
-        SELECT
-            u.id            AS usuario_id,
-            u.nombre        AS nombre,
-            u.email         AS email,
-            u.tipo_usuario  AS tipo_usuario,
-            u.fecha_registro AS fecha_registro,
-            s.plan          AS plan,
-            s.estado        AS estado,
-            s.fecha_inicio  AS fecha_inicio,
-            s.fecha_vencimiento AS fecha_vencimiento
-        FROM usuarios u
-        LEFT JOIN suscripciones s
-            ON s.id = (
-                SELECT id FROM suscripciones
-                WHERE usuario_id = u.id
-                ORDER BY id DESC LIMIT 1
-            )
-    """
-    parametros = ()
-    if tipo_usuario in TIPOS_USUARIO:
-        consulta += " WHERE u.tipo_usuario = ?"
-        parametros = (tipo_usuario,)
-    consulta += " ORDER BY u.tipo_usuario, u.nombre;"
+        consulta = """
+            SELECT
+                u.id            AS usuario_id,
+                u.nombre        AS nombre,
+                u.email         AS email,
+                u.tipo_usuario  AS tipo_usuario,
+                u.fecha_registro AS fecha_registro,
+                s.plan          AS plan,
+                s.estado        AS estado,
+                s.fecha_inicio  AS fecha_inicio,
+                s.fecha_vencimiento AS fecha_vencimiento
+            FROM usuarios u
+            LEFT JOIN suscripciones s
+                ON s.id = (
+                    SELECT id FROM suscripciones
+                    WHERE usuario_id = u.id
+                    ORDER BY id DESC LIMIT 1
+                )
+        """
+        parametros = ()
+        if tipo_usuario in TIPOS_USUARIO:
+            consulta += " WHERE u.tipo_usuario = %s"
+            parametros = (tipo_usuario,)
+        consulta += " ORDER BY u.tipo_usuario, u.nombre;"
 
-    cur.execute(consulta, parametros)
-    filas = [dict(f) for f in cur.fetchall()]
-    conn.close()
+        cur.execute(consulta, parametros)
+        filas = [dict(f) for f in cur.fetchall()]
+    finally:
+        conn.close()
     return filas
 
 
 def eliminar_usuario(usuario_id: int) -> bool:
     """Elimina un usuario y, por la clave foránea en cascada, sus suscripciones."""
     conn = obtener_conexion()
-    cur = conn.cursor()
-    cur.execute("DELETE FROM usuarios WHERE id = ?;", (usuario_id,))
-    conn.commit()
-    afectados = cur.rowcount
-    conn.close()
+    try:
+        cur = conn.cursor()
+        cur.execute("DELETE FROM usuarios WHERE id = %s;", (usuario_id,))
+        conn.commit()
+        afectados = cur.rowcount
+    finally:
+        conn.close()
+    return afectados > 0
+
+
+# ---------------------------------------------------------
+# REEMPLAZO MASIVO DE TABLAS TABULARES DESDE UN DATAFRAME
+# ---------------------------------------------------------
+# Conjunto cerrado de tablas escribibles por la app + sus columnas reales (sin
+# la PK sustituta 'id'). Es la ÚNICA fuente de verdad de qué nombres de tabla
+# son válidos y qué columnas acepta cada una (evita inyección de SQL).
+_COLUMNAS_POR_TABLA = {
+    "emprendedoras": ["Email", "Nombre", "Negocio", "Tipo_Oferta", "Categoria", "WhatsApp",
+                      "Descripcion", "Estado_Pago", "Metodo_Pago", "Contacto", "Estado_Aprobacion",
+                      "Estado", "Ciudad", "Colonia", "lat", "lon", "Celular", "INE_Doc", "CURP_Doc",
+                      "Historia", "CURP_Valor", "Foto_Perfil"],
+    "productos": ["Email_Emprendedora", "Producto", "Precio", "Categoria", "Stock",
+                  "Estado_Aprobacion", "Estado", "Foto_Producto"],
+    "finanzas": ["Fecha", "Email_Emprendedora", "Cliente", "Concepto", "Monto", "Tipo"],
+    "agenda": ["Email_Emprendedora", "Fecha", "Hora", "Evento", "Cliente_Contacto", "Notas"],
+    "tareas": ["Email_Emprendedora", "Tarea", "Prioridad", "Estatus"],
+    "evaluaciones": ["Fecha", "Email_Destino", "Autor_Email", "Autor_Nombre", "Calificacion", "Comentario"],
+    "oraciones": ["Fecha", "Nombre", "Email", "Celular", "Area", "Peticion", "Privada"],
+    "lives_grabados": ["Fecha_Emision", "Email_Emprendedora", "Nombre_Emprendedora", "Titulo_Live", "Frame_B64"],
+    "chat_live": ["Hora", "Usuario", "Mensaje"],
+}
+
+
+def reemplazar_tabla_desde_df(tabla: str, df) -> None:
+    """Reemplaza TODO el contenido de 'tabla' con las filas de 'df'.
+
+    Transaccional: TRUNCATE + append dentro de una sola transacción.
+    'tabla' debe ser una clave de _COLUMNAS_POR_TABLA (conjunto cerrado); si no,
+    lanza ValueError antes de tocar la BD (sin superficie de inyección SQL).
+    El DataFrame se reindexa a exactamente las columnas reales de la tabla:
+    columnas extra (p. ej. 'id', 'Fecha_Obj') se descartan y las ausentes se
+    añaden como NULL.
+    """
+    if tabla not in _COLUMNAS_POR_TABLA:
+        raise ValueError(f"Tabla no permitida para reemplazo: {tabla!r}")
+
+    columnas = _COLUMNAS_POR_TABLA[tabla]
+    df = df.copy()
+    df = df.reindex(columns=columnas)
+
+    eng = _get_engine()
+    with eng.begin() as conn:  # BEGIN; ... COMMIT (o ROLLBACK si falla)
+        # El nombre de tabla proviene de una clave validada del dict, no de
+        # entrada externa: sin riesgo de inyección.
+        conn.exec_driver_sql(f'TRUNCATE TABLE {tabla} RESTART IDENTITY')
+        df.to_sql(tabla, conn, if_exists="append", index=False)
+
+
+# ---------------------------------------------------------
+# CRUD DE ANUNCIOS (BANNER DE PUBLICIDAD)
+# ---------------------------------------------------------
+# Columnas que pueden actualizarse de forma dinámica (conjunto cerrado para que
+# actualizar_anuncio no permita inyección por nombres de columna arbitrarios).
+_COLUMNAS_ANUNCIO = (
+    "titulo", "tipo", "contenido", "fecha_inicio", "fecha_fin",
+    "activo", "precio", "anunciante",
+)
+
+
+def crear_anuncio(titulo, tipo, contenido, fecha_inicio, fecha_fin,
+                  anunciante="", precio=59, activo=True):
+    """Inserta un anuncio nuevo y devuelve su id.
+    'fecha_creacion' se fija con la hora actual (string)."""
+    fecha_creacion = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    conn = obtener_conexion()
+    try:
+        cur = conn.cursor()
+        cur.execute(
+            """
+            INSERT INTO anuncios
+                (titulo, tipo, contenido, fecha_inicio, fecha_fin,
+                 activo, fecha_creacion, precio, anunciante)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+            RETURNING id;
+            """,
+            (titulo, tipo, contenido, fecha_inicio, fecha_fin,
+             activo, fecha_creacion, precio, anunciante),
+        )
+        nuevo_id = cur.fetchone()["id"]
+        conn.commit()
+    finally:
+        conn.close()
+    return nuevo_id
+
+
+def listar_anuncios() -> list:
+    """Devuelve todos los anuncios como lista de dicts, del más reciente al más antiguo."""
+    conn = obtener_conexion()
+    try:
+        cur = conn.cursor()
+        cur.execute("SELECT * FROM anuncios ORDER BY id DESC;")
+        filas = [dict(f) for f in cur.fetchall()]
+    finally:
+        conn.close()
+    return filas
+
+
+def obtener_anuncios_vigentes(fecha=None) -> list:
+    """Devuelve los anuncios activos cuya ventana [fecha_inicio, fecha_fin]
+    contiene 'fecha' (por defecto, hoy). Lista de dicts ordenada por id."""
+    if fecha is None:
+        fecha = date.today()
+    conn = obtener_conexion()
+    try:
+        cur = conn.cursor()
+        cur.execute(
+            """
+            SELECT * FROM anuncios
+            WHERE fecha_inicio <= %s AND fecha_fin >= %s AND activo = true
+            ORDER BY id;
+            """,
+            (fecha, fecha),
+        )
+        filas = [dict(f) for f in cur.fetchall()]
+    finally:
+        conn.close()
+    return filas
+
+
+def actualizar_anuncio(id, **campos) -> bool:
+    """Actualiza dinámicamente los campos indicados de un anuncio.
+    Solo se aceptan columnas del conjunto cerrado _COLUMNAS_ANUNCIO (sin
+    inyección por nombres de columna). Devuelve True si se actualizó una fila."""
+    campos_validos = {k: v for k, v in campos.items() if k in _COLUMNAS_ANUNCIO}
+    if not campos_validos:
+        return False
+
+    asignaciones = ", ".join(f"{col} = %s" for col in campos_validos)
+    valores = list(campos_validos.values())
+    valores.append(id)
+
+    conn = obtener_conexion()
+    try:
+        cur = conn.cursor()
+        cur.execute(
+            f"UPDATE anuncios SET {asignaciones} WHERE id = %s;",
+            valores,
+        )
+        conn.commit()
+        afectados = cur.rowcount
+    finally:
+        conn.close()
+    return afectados > 0
+
+
+def eliminar_anuncio(id) -> bool:
+    """Elimina un anuncio por id. Devuelve True si se borró una fila."""
+    conn = obtener_conexion()
+    try:
+        cur = conn.cursor()
+        cur.execute("DELETE FROM anuncios WHERE id = %s;", (id,))
+        conn.commit()
+        afectados = cur.rowcount
+    finally:
+        conn.close()
+    return afectados > 0
+
+
+def activar_desactivar_anuncio(id, activo) -> bool:
+    """Activa o desactiva un anuncio. Devuelve True si se actualizó una fila."""
+    conn = obtener_conexion()
+    try:
+        cur = conn.cursor()
+        cur.execute("UPDATE anuncios SET activo = %s WHERE id = %s;", (activo, id))
+        conn.commit()
+        afectados = cur.rowcount
+    finally:
+        conn.close()
     return afectados > 0
 
 
