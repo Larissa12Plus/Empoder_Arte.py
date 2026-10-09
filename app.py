@@ -907,8 +907,12 @@ with st.sidebar:
 # ---------------------------------------------------------
 # 5. PESTAÑAS PRINCIPALES
 # ---------------------------------------------------------
+# Orden deseado: la Zona VIP queda en la SEGUNDA posición, justo después del Directorio.
+# Los bloques de contenido se referencian por NOMBRE (ver tab_por_nombre más abajo),
+# así que reordenar esta lista basta: ningún índice literal depende del orden.
 titulos_pestañas = [
     "🌸 Directorio de Servicios",
+    "👑 Zona VIP / Exclusivo",      # movida aquí (antes iba al final)
     "🛍️ Marketplace",
     "🗺️ Mapa México",
     "🔴 Transmisión En Vivo",
@@ -917,10 +921,9 @@ titulos_pestañas = [
     "💼 Mi Oficina",
     "📚 Educación",
 ]
-# Zona VIP: índice 8 fijo, SIEMPRE presente (antes del Dashboard Admin condicional).
-titulos_pestañas.append("👑 Zona VIP / Exclusivo")
+# Dashboard Admin: condicional, siempre al final y solo visible para la administradora.
 if st.session_state["es_admin"]:
-    titulos_pestañas.append("📊 Dashboard Admin")  # ahora índice 9 (solo admin)
+    titulos_pestañas.append("📊 Dashboard Admin")
 
 # ---------------------------------------------------------
 # BANNER PUBLICITARIO DE ENTRADA (visible para TODAS las visitantes)
@@ -998,9 +1001,12 @@ elif st.session_state.get("es_admin"):
     """, unsafe_allow_html=True)
 
 pestañas = st.tabs(titulos_pestañas)
+# Mapeo nombre -> objeto pestaña. Cada bloque de contenido se referencia por su título
+# exacto (no por índice), de modo que reordenar titulos_pestañas no descoloca nada.
+tab_por_nombre = {nombre: tab for nombre, tab in zip(titulos_pestañas, pestañas)}
 
-# --- PESTAÑA 1: DIRECTORIO DE SERVICIOS CON RESEÑAS Y ESTRELLAS ---
-with pestañas[0]:
+# --- PESTAÑA: DIRECTORIO DE SERVICIOS CON RESEÑAS Y ESTRELLAS ---
+with tab_por_nombre["🌸 Directorio de Servicios"]:
     st.markdown('<h3 class="brand-font" style="color:#D81B60;">🌸 Directorio de Servicios, Historias, Lives y Evaluaciones</h3>', unsafe_allow_html=True)
     df_servicios = df_emprendedoras[
         (df_emprendedoras["Tipo_Oferta"] == "Servicios") & 
@@ -1165,8 +1171,8 @@ with pestañas[0]:
                             st.success("¡Perfil actualizado con éxito!")
                             st.rerun()
 
-# --- PESTAÑA 2: MARKETPLACE CON EDICIÓN Y ELIMINACIÓN DE PUBLICACIONES Y CATEGORÍAS DINÁMICAS ---
-with pestañas[1]:
+# --- PESTAÑA: MARKETPLACE CON EDICIÓN Y ELIMINACIÓN DE PUBLICACIONES Y CATEGORÍAS DINÁMICAS ---
+with tab_por_nombre["🛍️ Marketplace"]:
     st.markdown('<h3 class="brand-font" style="color:#D81B60;">🛍️ Marketplace Nacional Empoder-Arte</h3>', unsafe_allow_html=True)
 
     # DIAGNÓSTICO DE CONEXIÓN (visible SOLO para la administradora).
@@ -1381,8 +1387,8 @@ with pestañas[1]:
                             elif prod_id is not None:
                                 st.warning("No se encontró el producto (quizá ya fue eliminado). Recarga la página.")
 
-# --- PESTAÑA 3: MAPA INTERACTIVO NACIONAL ---
-with pestañas[2]:
+# --- PESTAÑA: MAPA INTERACTIVO NACIONAL ---
+with tab_por_nombre["🗺️ Mapa México"]:
     st.markdown('<h3 class="brand-font" style="color:#D81B60;">🗺️ Ubicación Nacional de Emprendedoras Empoder-Arte</h3>', unsafe_allow_html=True)
     df_mapa = df_emprendedoras[df_emprendedoras["Estado_Aprobacion"] == "Aprobado"].copy()
     
@@ -1433,8 +1439,8 @@ with pestañas[2]:
         )
         st.pydeck_chart(mapa_deck)
 
-# --- PESTAÑA 4: TRANSMISIÓN EN VIVO ---
-with pestañas[3]:
+# --- PESTAÑA: TRANSMISIÓN EN VIVO ---
+with tab_por_nombre["🔴 Transmisión En Vivo"]:
     st.markdown('<h3 class="brand-font" style="color:#D81B60;">🔴 Sala de Live Stream Nativa Empoder-Arte</h3>', unsafe_allow_html=True)
     
     es_vip_o_admin = st.session_state["sesion_activa"] and (
@@ -1554,8 +1560,8 @@ with pestañas[3]:
                 guardar_datos(df_chat, ARCHIVO_CHAT)
                 st.rerun()
 
-# --- PESTAÑA 5: REGISTRO / UNIRME CON CASILLA OBLIGATORIA DE AVISO DE PRIVACIDAD Y CATEGORÍAS DINÁMICAS ---
-with pestañas[4]:
+# --- PESTAÑA: REGISTRO / UNIRME CON CASILLA OBLIGATORIA DE AVISO DE PRIVACIDAD Y CATEGORÍAS DINÁMICAS ---
+with tab_por_nombre["📝 Registro / Unirme"]:
     st.markdown('<h3 class="brand-font" style="color:#D81B60;">📝 Únete a la Comunidad Empoder-Arte</h3>', unsafe_allow_html=True)
     # El Aviso de Privacidad se muestra SOLO en los registros de emprendedora (que suben INE),
     # no en el registro de cliente (no aporta datos sensibles).
@@ -1844,8 +1850,8 @@ with pestañas[4]:
                         st.success("¡Registro VIP completado e inicio de sesión guardado para el día!")
                         st.rerun()
 
-# --- PESTAÑA 6: PETICIÓN DE ORACIÓN CON ÁREA Y CELULAR DE CONTACTO ---
-with pestañas[5]:
+# --- PESTAÑA: PETICIÓN DE ORACIÓN CON ÁREA Y CELULAR DE CONTACTO ---
+with tab_por_nombre["🙏 Petición Oración"]:
     st.markdown('<h3 class="brand-font" style="color:#D81B60;">🙏 Petición Privada u Oración Comunitaria</h3>', unsafe_allow_html=True)
     st.write("Unidas en fe y apoyo mutuo. Escribe tu petición para que nuestra comunidad o el equipo pastoral interceda por ti.")
     
@@ -1891,8 +1897,8 @@ with pestañas[5]:
             guardar_datos(df_oraciones, ARCHIVO_ORACIONES)
             st.success("🙏 ¡Tu petición ha sido recibida! Estaremos orando por ti.")
 
-# --- PESTAÑA 7: MI OFICINA (MÉTRICAS, AGENDA, TAREAS Y ELIMINACIÓN DE TRANSACCIONES) ---
-with pestañas[6]:
+# --- PESTAÑA: MI OFICINA (MÉTRICAS, AGENDA, TAREAS Y ELIMINACIÓN DE TRANSACCIONES) ---
+with tab_por_nombre["💼 Mi Oficina"]:
     st.markdown('<h3 class="brand-font" style="color:#D81B60;">💼 Mi Oficina | Empoder-Arte</h3>', unsafe_allow_html=True)
     
     es_vip = st.session_state["sesion_activa"] and (
@@ -2071,8 +2077,8 @@ with pestañas[6]:
                         st.success("¡Tarea actualizada!")
                         st.rerun()
 
-# --- PESTAÑA 8: EDUCACIÓN Y CAPACITACIÓN CON COMPRESIÓN DE VIDEO ---
-with pestañas[7]:
+# --- PESTAÑA: EDUCACIÓN Y CAPACITACIÓN CON COMPRESIÓN DE VIDEO ---
+with tab_por_nombre["📚 Educación"]:
     st.markdown("""
         <div class="capacitacion-container">
             <h3 class="brand-font" style="color:#D81B60; margin-top:0;">📚 Centro de Capacitación y Cursos Empoder-Arte</h3>
@@ -2141,8 +2147,8 @@ with pestañas[7]:
         else:
             st.info("Aún no hay videos registrados en la plataforma.")
 
-# --- PESTAÑA 9: ZONA VIP / EXCLUSIVO (índice 8, siempre presente) ---
-with pestañas[8]:
+# --- PESTAÑA: ZONA VIP / EXCLUSIVO (segunda posición, siempre presente) ---
+with tab_por_nombre["👑 Zona VIP / Exclusivo"]:
     # Resolver el usuario SQLite UNA sola vez y ramificar en 4 estados.
     if not st.session_state.get("sesion_activa"):
         # ESTADO A — Visitante sin sesión: invitar a iniciar sesión.
@@ -2228,9 +2234,10 @@ with pestañas[8]:
                 st.success("¡Pago simulado! Tu suscripción VIP quedó activa.")
                 st.rerun()
 
-# --- PESTAÑA 10: DASHBOARD ADMIN & GESTIÓN TOTAL DE USUARIOS ---
-if st.session_state["es_admin"]:
-    with pestañas[9]:
+# --- PESTAÑA: DASHBOARD ADMIN & GESTIÓN TOTAL DE USUARIOS ---
+# Esta pestaña solo existe en tab_por_nombre cuando la usuaria es administradora.
+if "📊 Dashboard Admin" in tab_por_nombre:
+    with tab_por_nombre["📊 Dashboard Admin"]:
         st.markdown('<h3 class="brand-font" style="color:#D81B60;">👑 Módulo Exclusivo de Aprobación, Seguridad y Gestión de Usuarios (Fundadora)</h3>', unsafe_allow_html=True)
         st.write("Bienvenida, Larissa. Desde este panel tienes control total sobre los usuarios, asignación de roles, bajas, eliminación definitiva y reseteo de contraseñas.")
         
@@ -2572,6 +2579,6 @@ def renderizar_alertas_y_control_vip():
             st.warning(f"🟡 **Aviso de Renovación Próxima:** {mensaje}")
 
 # Control VIP legacy JSON DESHABILITADO: SQLite (database.py) es la ÚNICA fuente de verdad
-# de suscripciones. Ver Zona VIP (pestañas[8]) y Gestión de Suscripciones (t_admin_subs).
+# de suscripciones. Ver Zona VIP (tab_por_nombre["👑 Zona VIP / Exclusivo"]) y Gestión de Suscripciones (t_admin_subs).
 # Las funciones se dejan definidas (sin invocar) para facilitar rollback.
 # renderizar_alertas_y_control_vip()
