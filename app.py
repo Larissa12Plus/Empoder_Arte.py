@@ -306,37 +306,49 @@ def crear_df_inicial_fundadora():
     }])
 
 def cargar_datos():
-    if os.path.exists(ARCHIVO_CSV):
-        try:
-            df = pd.read_csv(ARCHIVO_CSV)
-            if df.empty:
-                df = crear_df_inicial_fundadora()
-                df.to_csv(ARCHIVO_CSV, index=False)
-            else:
-                for col in ["Estado", "Ciudad", "Colonia", "Tipo_Oferta", "Estado_Aprobacion", "Celular", "Foto_Perfil", "INE_Doc", "CURP_Valor", "Historia"]:
-                    if col not in df.columns:
-                        df[col] = "Querétaro" if col == "Estado" else ("Aprobado" if col == "Estado_Aprobacion" else (FOTO_DEFAULT if col == "Foto_Perfil" else "Por definir"))
-                
-                df["Foto_Perfil"] = df["Foto_Perfil"].fillna(FOTO_DEFAULT)
-                df.loc[df["Foto_Perfil"].str.contains("via.placeholder.com", na=False), "Foto_Perfil"] = FOTO_DEFAULT
-                
-                df["lat"] = df["Estado"].map(lambda x: COORDENADAS_ESTADOS.get(str(x), (23.6345, -102.5528))[0])
-                df["lon"] = df["Estado"].map(lambda x: COORDENADAS_ESTADOS.get(str(x), (23.6345, -102.5528))[1])
-                
-                mask_admin = df["Email"] == CORREO_ADMIN
-                if mask_admin.any():
-                    df.loc[mask_admin, "Nombre"] = NOMBRE_FUNDADORA
-                    df.loc[mask_admin, "Estado_Aprobacion"] = "Aprobado"
-                    df.to_csv(ARCHIVO_CSV, index=False)
-            return df
-        except Exception:
-            df_i = crear_df_inicial_fundadora()
-            df_i.to_csv(ARCHIVO_CSV, index=False)
-            return df_i
-    else:
-        df_i = crear_df_inicial_fundadora()
-        df_i.to_csv(ARCHIVO_CSV, index=False)
-        return df_i
+    # 22 columnas reales de la tabla 'emprendedoras' (orden determinista que ve la app).
+    columnas_esperadas = ["Email", "Nombre", "Negocio", "Tipo_Oferta", "Categoria", "WhatsApp",
+                          "Descripcion", "Estado_Pago", "Metodo_Pago", "Contacto", "Estado_Aprobacion",
+                          "Estado", "Ciudad", "Colonia", "lat", "lon", "Celular", "INE_Doc", "CURP_Doc",
+                          "Historia", "CURP_Valor", "Foto_Perfil"]
+    try:
+        df = pd.read_sql("SELECT * FROM emprendedoras", db._get_engine())
+        if "id" in df.columns:
+            df = df.drop(columns=["id"])
+
+        if df.empty:
+            # Tabla vacía: usar la semilla de la fundadora, reindexada a las 22 columnas.
+            df = crear_df_inicial_fundadora().reindex(columns=columnas_esperadas)
+            for col in columnas_esperadas:
+                default = "" if col != "CURP_Doc" else "No proporcionado"
+                df[col] = df[col].fillna(default)
+            return df[columnas_esperadas]
+
+        # Añadir columnas faltantes con su default actual.
+        for col in columnas_esperadas:
+            if col not in df.columns:
+                df[col] = "Querétaro" if col == "Estado" else ("Aprobado" if col == "Estado_Aprobacion" else (FOTO_DEFAULT if col == "Foto_Perfil" else "Por definir"))
+
+        df["Foto_Perfil"] = df["Foto_Perfil"].fillna(FOTO_DEFAULT)
+        df.loc[df["Foto_Perfil"].astype(str).str.contains("via.placeholder.com", na=False), "Foto_Perfil"] = FOTO_DEFAULT
+
+        # lat/lon derivados de Estado (solo en memoria, se recomputan en cada carga).
+        df["lat"] = df["Estado"].map(lambda x: COORDENADAS_ESTADOS.get(str(x), (23.6345, -102.5528))[0])
+        df["lon"] = df["Estado"].map(lambda x: COORDENADAS_ESTADOS.get(str(x), (23.6345, -102.5528))[1])
+
+        # Fix admin (solo en memoria): nombre y aprobación de la fundadora.
+        mask_admin = df["Email"] == CORREO_ADMIN
+        if mask_admin.any():
+            df.loc[mask_admin, "Nombre"] = NOMBRE_FUNDADORA
+            df.loc[mask_admin, "Estado_Aprobacion"] = "Aprobado"
+
+        return df[columnas_esperadas]
+    except Exception:
+        df_i = crear_df_inicial_fundadora().reindex(columns=columnas_esperadas)
+        for col in columnas_esperadas:
+            default = "" if col != "CURP_Doc" else "No proporcionado"
+            df_i[col] = df_i[col].fillna(default)
+        return df_i[columnas_esperadas]
 
 def cargar_productos():
     df_base_prods = pd.DataFrame([
@@ -361,167 +373,151 @@ def cargar_productos():
             "Foto_Producto": "https://picsum.photos/300/200"
         }
     ])
-    if os.path.exists(ARCHIVO_PRODUCTOS):
-        try:
-            df_p = pd.read_csv(ARCHIVO_PRODUCTOS)
-            if df_p.empty:
-                df_p = df_base_prods
-                df_p.to_csv(ARCHIVO_PRODUCTOS, index=False)
-            else:
-                if "Estado_Aprobacion" not in df_p.columns:
-                    df_p["Estado_Aprobacion"] = "Aprobado"
-                if "Estado" not in df_p.columns:
-                    df_p["Estado"] = "Querétaro"
-                if "Foto_Producto" not in df_p.columns:
-                    df_p["Foto_Producto"] = "https://picsum.photos/300/200"
-                df_p.to_csv(ARCHIVO_PRODUCTOS, index=False)
-            return df_p
-        except Exception:
-            df_base_prods.to_csv(ARCHIVO_PRODUCTOS, index=False)
-            return df_base_prods
-    else:
-        df_base_prods.to_csv(ARCHIVO_PRODUCTOS, index=False)
-        return df_base_prods
+    columnas_esperadas = ["Email_Emprendedora", "Producto", "Precio", "Categoria", "Stock",
+                          "Estado_Aprobacion", "Estado", "Foto_Producto"]
+    try:
+        df_p = pd.read_sql("SELECT * FROM productos", db._get_engine())
+        if "id" in df_p.columns:
+            df_p = df_p.drop(columns=["id"])
+        if df_p.empty:
+            return df_base_prods[columnas_esperadas]
+        if "Estado_Aprobacion" not in df_p.columns:
+            df_p["Estado_Aprobacion"] = "Aprobado"
+        if "Estado" not in df_p.columns:
+            df_p["Estado"] = "Querétaro"
+        if "Foto_Producto" not in df_p.columns:
+            df_p["Foto_Producto"] = "https://picsum.photos/300/200"
+        return df_p[columnas_esperadas]
+    except Exception:
+        return df_base_prods[columnas_esperadas]
 
 def cargar_chat_live():
-    if os.path.exists(ARCHIVO_CHAT):
-        try:
-            return pd.read_csv(ARCHIVO_CHAT)
-        except Exception:
-            df = pd.DataFrame(columns=["Hora", "Usuario", "Mensaje"])
-            df.to_csv(ARCHIVO_CHAT, index=False)
-            return df
-    else:
-        df = pd.DataFrame(columns=["Hora", "Usuario", "Mensaje"])
-        df.to_csv(ARCHIVO_CHAT, index=False)
-        return df
+    columnas_esperadas = ["Hora", "Usuario", "Mensaje"]
+    try:
+        df = pd.read_sql("SELECT * FROM chat_live", db._get_engine())
+        if "id" in df.columns:
+            df = df.drop(columns=["id"])
+        for col in columnas_esperadas:
+            if col not in df.columns:
+                df[col] = ""
+        return df[columnas_esperadas]
+    except Exception:
+        return pd.DataFrame(columns=columnas_esperadas)
 
 def cargar_oraciones():
     columnas_esperadas = ["Fecha", "Nombre", "Email", "Celular", "Area", "Peticion", "Privada"]
-    if os.path.exists(ARCHIVO_ORACIONES):
-        try:
-            df = pd.read_csv(ARCHIVO_ORACIONES)
-            for col in columnas_esperadas:
-                if col not in df.columns:
-                    df[col] = "General" if col == "Area" else "N/A"
-            df = df[columnas_esperadas]
-            df.to_csv(ARCHIVO_ORACIONES, index=False)
-            return df
-        except Exception:
-            df = pd.DataFrame(columns=columnas_esperadas)
-            df.to_csv(ARCHIVO_ORACIONES, index=False)
-            return df
-    else:
-        df = pd.DataFrame(columns=columnas_esperadas)
-        df.to_csv(ARCHIVO_ORACIONES, index=False)
-        return df
+    try:
+        df = pd.read_sql("SELECT * FROM oraciones", db._get_engine())
+        if "id" in df.columns:
+            df = df.drop(columns=["id"])
+        for col in columnas_esperadas:
+            if col not in df.columns:
+                df[col] = "General" if col == "Area" else "N/A"
+        df["Area"] = df["Area"].fillna("General")
+        return df[columnas_esperadas]
+    except Exception:
+        return pd.DataFrame(columns=columnas_esperadas)
 
 def cargar_finanzas():
     columnas_esperadas = ["Fecha", "Email_Emprendedora", "Cliente", "Concepto", "Monto", "Tipo"]
-    if os.path.exists(ARCHIVO_FINANZAS):
-        try:
-            df = pd.read_csv(ARCHIVO_FINANZAS)
-            for col in columnas_esperadas:
-                if col not in df.columns:
-                    df[col] = "General" if col == "Cliente" else "Sin especificar"
-            df = df[columnas_esperadas]
-            df.to_csv(ARCHIVO_FINANZAS, index=False)
-            return df
-        except Exception:
-            df = pd.DataFrame(columns=columnas_esperadas)
-            df.to_csv(ARCHIVO_FINANZAS, index=False)
-            return df
-    else:
-        df = pd.DataFrame(columns=columnas_esperadas)
-        df.to_csv(ARCHIVO_FINANZAS, index=False)
-        return df
+    try:
+        df = pd.read_sql("SELECT * FROM finanzas", db._get_engine())
+        if "id" in df.columns:
+            df = df.drop(columns=["id"])
+        for col in columnas_esperadas:
+            if col not in df.columns:
+                df[col] = "General" if col == "Cliente" else "Sin especificar"
+        return df[columnas_esperadas]
+    except Exception:
+        return pd.DataFrame(columns=columnas_esperadas)
 
 def cargar_agenda():
     columnas_esperadas = ["Email_Emprendedora", "Fecha", "Hora", "Evento", "Cliente_Contacto", "Notas"]
-    if os.path.exists(ARCHIVO_AGENDA):
-        try:
-            df = pd.read_csv(ARCHIVO_AGENDA)
-            for col in columnas_esperadas:
-                if col not in df.columns:
-                    df[col] = "N/A"
-            df = df[columnas_esperadas]
-            df.to_csv(ARCHIVO_AGENDA, index=False)
-            return df
-        except Exception:
-            df = pd.DataFrame(columns=columnas_esperadas)
-            df.to_csv(ARCHIVO_AGENDA, index=False)
-            return df
-    else:
-        df = pd.DataFrame(columns=columnas_esperadas)
-        df.to_csv(ARCHIVO_AGENDA, index=False)
-        return df
+    try:
+        df = pd.read_sql("SELECT * FROM agenda", db._get_engine())
+        if "id" in df.columns:
+            df = df.drop(columns=["id"])
+        for col in columnas_esperadas:
+            if col not in df.columns:
+                df[col] = "N/A"
+        return df[columnas_esperadas]
+    except Exception:
+        return pd.DataFrame(columns=columnas_esperadas)
 
 def cargar_tareas():
     columnas_esperadas = ["Email_Emprendedora", "Tarea", "Prioridad", "Estatus"]
-    if os.path.exists(ARCHIVO_TAREAS):
-        try:
-            df = pd.read_csv(ARCHIVO_TAREAS)
-            for col in columnas_esperadas:
-                if col not in df.columns:
-                    df[col] = "Pendiente ⏳" if col == "Estatus" else "N/A"
-            df = df[columnas_esperadas]
-            df.to_csv(ARCHIVO_TAREAS, index=False)
-            return df
-        except Exception:
-            df = pd.DataFrame(columns=columnas_esperadas)
-            df.to_csv(ARCHIVO_TAREAS, index=False)
-            return df
-    else:
-        df = pd.DataFrame(columns=columnas_esperadas)
-        df.to_csv(ARCHIVO_TAREAS, index=False)
-        return df
+    try:
+        df = pd.read_sql("SELECT * FROM tareas", db._get_engine())
+        if "id" in df.columns:
+            df = df.drop(columns=["id"])
+        for col in columnas_esperadas:
+            if col not in df.columns:
+                df[col] = "Pendiente ⏳" if col == "Estatus" else "N/A"
+        df["Estatus"] = df["Estatus"].fillna("Pendiente ⏳")
+        return df[columnas_esperadas]
+    except Exception:
+        return pd.DataFrame(columns=columnas_esperadas)
 
 def cargar_evaluaciones():
     columnas_esperadas = ["Fecha", "Email_Destino", "Autor_Email", "Autor_Nombre", "Calificacion", "Comentario"]
-    if os.path.exists(ARCHIVO_EVALUACIONES):
-        try:
-            df = pd.read_csv(ARCHIVO_EVALUACIONES)
-            for col in columnas_esperadas:
-                if col not in df.columns:
-                    df[col] = "Anonimo" if col == "Autor_Nombre" else "N/A"
-            df = df[columnas_esperadas]
-            df.to_csv(ARCHIVO_EVALUACIONES, index=False)
-            return df
-        except Exception:
-            df = pd.DataFrame(columns=columnas_esperadas)
-            df.to_csv(ARCHIVO_EVALUACIONES, index=False)
-            return df
-    else:
-        df = pd.DataFrame(columns=columnas_esperadas)
-        df.to_csv(ARCHIVO_EVALUACIONES, index=False)
-        return df
+    try:
+        df = pd.read_sql("SELECT * FROM evaluaciones", db._get_engine())
+        if "id" in df.columns:
+            df = df.drop(columns=["id"])
+        for col in columnas_esperadas:
+            if col not in df.columns:
+                df[col] = "Anonimo" if col == "Autor_Nombre" else "N/A"
+        return df[columnas_esperadas]
+    except Exception:
+        return pd.DataFrame(columns=columnas_esperadas)
 
 def cargar_lives_grabados():
     columnas_esperadas = ["Fecha_Emision", "Email_Emprendedora", "Nombre_Emprendedora", "Titulo_Live", "Frame_B64"]
-    if os.path.exists(ARCHIVO_LIVES):
-        try:
-            df = pd.read_csv(ARCHIVO_LIVES)
-            for col in columnas_esperadas:
-                if col not in df.columns:
-                    df[col] = "N/A"
-            df = df[columnas_esperadas]
-            # Filtrar automáticos los de más de 5 días de antigüedad
-            df["Fecha_Obj"] = pd.to_datetime(df["Fecha_Emision"], errors='coerce')
-            hace_5_dias = pd.Timestamp.now() - pd.Timedelta(days=5)
-            df = df[df["Fecha_Obj"] >= hace_5_dias].drop(columns=["Fecha_Obj"])
-            df.to_csv(ARCHIVO_LIVES, index=False)
-            return df
-        except Exception:
-            df = pd.DataFrame(columns=columnas_esperadas)
-            df.to_csv(ARCHIVO_LIVES, index=False)
-            return df
-    else:
-        df = pd.DataFrame(columns=columnas_esperadas)
-        df.to_csv(ARCHIVO_LIVES, index=False)
+    try:
+        df = pd.read_sql("SELECT * FROM lives_grabados", db._get_engine())
+        if "id" in df.columns:
+            df = df.drop(columns=["id"])
+        for col in columnas_esperadas:
+            if col not in df.columns:
+                df[col] = "N/A"
+        df = df[columnas_esperadas]
+        # Filtrar automáticos los de más de 5 días de antigüedad (solo en memoria).
+        df["Fecha_Obj"] = pd.to_datetime(df["Fecha_Emision"], errors='coerce')
+        hace_5_dias = pd.Timestamp.now() - pd.Timedelta(days=5)
+        df = df[df["Fecha_Obj"] >= hace_5_dias].drop(columns=["Fecha_Obj"])
         return df
+    except Exception:
+        return pd.DataFrame(columns=columnas_esperadas)
+
+# Mapea cada constante ARCHIVO_* a su tabla destino en Postgres. Es la única fuente
+# de verdad de qué guardado corresponde a qué tabla (dispatcher de guardar_datos).
+_MAPA_ARCHIVO_TABLA = {
+    ARCHIVO_CSV: "emprendedoras",
+    ARCHIVO_PRODUCTOS: "productos",
+    ARCHIVO_FINANZAS: "finanzas",
+    ARCHIVO_AGENDA: "agenda",
+    ARCHIVO_TAREAS: "tareas",
+    ARCHIVO_EVALUACIONES: "evaluaciones",
+    ARCHIVO_ORACIONES: "oraciones",
+    ARCHIVO_LIVES: "lives_grabados",
+    ARCHIVO_CHAT: "chat_live",
+}
 
 def guardar_datos(df, archivo):
-    df.to_csv(archivo, index=False)
+    """Reemplaza la tabla destino (según el nombre de 'archivo') con el DataFrame
+    completo en Postgres. Si el destino no está mapeado, NO escribe un CSV huérfano:
+    avisa y aborta el guardado."""
+    tabla = _MAPA_ARCHIVO_TABLA.get(archivo)
+    if tabla is None:
+        st.error("Destino de guardado no reconocido.")
+        print(f"[guardar_datos] archivo sin mapear a tabla: {archivo!r}")
+        return
+    try:
+        db.reemplazar_tabla_desde_df(tabla, df)
+    except Exception as e:
+        st.error("No se pudieron guardar los cambios en la base de datos. "
+                 "Verifica tu conexión e inténtalo de nuevo.")
+        print(f"[guardar_datos] fallo al escribir '{tabla}': {e}")
 
 def eliminar_usuario_definitivo(email_objetivo: str):
     """Elimina completamente un usuario de usuarios.json y emprendedoras.csv"""
@@ -554,8 +550,13 @@ sesion_activa_hoy = validar_sesion_diaria()
 # sesión activa no corta los gates por rol_usuario hasta el próximo login (la Zona VIP sí
 # refleja el estado en vivo). Alcance mono-usuario, aceptable.
 if "db_inicializada" not in st.session_state:
-    db.inicializar_db()
-    st.session_state["db_inicializada"] = True
+    try:
+        db.inicializar_db()
+        st.session_state["db_inicializada"] = True
+    except Exception as e:
+        st.error("No se pudo conectar a la base de datos. Intenta de nuevo en unos momentos.")
+        print(f"[inicializar_db] fallo de conexión/inicialización: {e}")
+        st.stop()
 
 if "sesion_activa" not in st.session_state:
     if sesion_activa_hoy:
