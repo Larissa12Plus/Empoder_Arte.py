@@ -66,9 +66,9 @@ productos y servicios, finanzas, agenda, peticiones de oración, lives y evaluac
 
 ## ☁️ Despliegue en Streamlit Cloud (base de datos Supabase)
 
-La plataforma usa una base de datos **PostgreSQL en Supabase** como fuente de verdad. La conexión
-se resuelve a través de la variable `DB_URL`, que **nunca** debe quedar escrita en el código ni en
-el repositorio.
+La plataforma usa una base de datos **PostgreSQL en Supabase** como fuente de verdad. Tanto la
+conexión (`DB_URL`) como la contraseña del panel admin (`ADMIN_PASS`) se resuelven a través de
+secrets y **nunca** deben quedar escritas en el código ni en el repositorio.
 
 1. En Streamlit Cloud, abre tu app y ve a **Settings → Secrets**.
 2. Agrega la clave `DB_URL` con la cadena de conexión del *pooler* de Supabase. Usa este formato
@@ -77,6 +77,15 @@ el repositorio.
 
    ```toml
    DB_URL = "postgresql://postgres.sqlfcnoyijqvocabialv:TU_PASSWORD@aws-1-us-west-2.pooler.supabase.com:6543/postgres"
+   ```
+
+   En el mismo apartado **Settings → Secrets**, agrega también la clave `ADMIN_PASS` con la
+   contraseña de la administradora/fundadora (el login del panel admin). Si no la defines, la app
+   usa un valor por defecto de compatibilidad, pero por seguridad **debe** configurarse como secret
+   (el repositorio es público):
+
+   ```toml
+   ADMIN_PASS = "TU_PASSWORD_ADMIN"
    ```
 
    Parámetros del pooler compartido de Supabase:
@@ -89,8 +98,8 @@ el repositorio.
    > Si tu contraseña contiene caracteres especiales (`*`, `@`, `:`, etc.), debes
    > *percent-encode*-arlos en la cadena de conexión (por ejemplo, `*` se escribe `%2A`).
 
-3. Localmente, la misma clave `DB_URL` vive en `.streamlit/secrets.toml` (archivo *gitignored*,
-   **no se versiona**).
+3. Localmente, las mismas claves `DB_URL` y `ADMIN_PASS` viven en `.streamlit/secrets.toml`
+   (archivo *gitignored*, **no se versiona**).
 
 ### 🔄 Migración de datos (una sola vez)
 

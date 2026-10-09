@@ -38,7 +38,10 @@ ARCHIVO_SESION = "session.json"
 ARCHIVO_CATEGORIAS = "categorias_dinamicas.json"
 CORREO_ADMIN = "garcialarissa1292@gmail.com"
 NOMBRE_FUNDADORA = "Larissa García"
-PASS_ADMIN_PLANA = "Lariliz1*"
+# La contraseña de admin NO se hardcodea: se resuelve con precedencia
+# ADMIN_PASS (entorno) -> st.secrets['ADMIN_PASS'] -> .streamlit/secrets.toml,
+# reutilizando el resolvedor de la capa de datos (db._resolver_admin_pass).
+PASS_ADMIN_PLANA = db.PASS_ADMIN_PLANA
 
 def generar_hash(password: str) -> str:
     """Genera un hash SHA-256 seguro para almacenar contraseñas."""

@@ -45,7 +45,50 @@ NOMBRE_DB = "empoder_arte.db"
 # Datos de la administradora / fundadora (único usuario inicial)
 CORREO_ADMIN = "garcialarissa1292@gmail.com"
 NOMBRE_ADMIN = "Larissa García (Fundadora)"
-PASS_ADMIN_PLANA = "Lariliz1*"
+
+# Valor por defecto SOLO como fallback de compatibilidad (ver _resolver_admin_pass).
+_ADMIN_PASS_DEFAULT = "Lariliz1*"
+
+
+def _resolver_admin_pass():
+    """Resuelve la contraseña de admin con la MISMA PRECEDENCIA que DB_URL:
+
+      1) Variable de entorno ADMIN_PASS (script standalone / CI).
+      2) st.secrets['ADMIN_PASS'] (cuando corre dentro de Streamlit).
+      3) Parseo directo de .streamlit/secrets.toml con tomllib (stdlib 3.11+).
+
+    Si no se encuentra en ninguna fuente, usa _ADMIN_PASS_DEFAULT como fallback
+    de compatibilidad para que el login NO se rompa. El secret tiene prioridad.
+    """
+    # 1) Variable de entorno
+    valor = os.environ.get("ADMIN_PASS")
+    if valor:
+        return valor
+
+    # 2) Secrets de Streamlit (sólo disponible dentro de la app)
+    try:
+        import streamlit as st
+        if "ADMIN_PASS" in st.secrets:
+            return st.secrets["ADMIN_PASS"]
+    except Exception:
+        pass
+
+    # 3) Parsear .streamlit/secrets.toml (hermano de este archivo)
+    try:
+        import tomllib
+        ruta = os.path.join(os.path.dirname(__file__), ".streamlit", "secrets.toml")
+        with open(ruta, "rb") as f:
+            valor = tomllib.load(f).get("ADMIN_PASS")
+            if valor:
+                return valor
+    except Exception:
+        pass
+
+    # 4) Fallback de compatibilidad
+    return _ADMIN_PASS_DEFAULT
+
+
+PASS_ADMIN_PLANA = _resolver_admin_pass()
 
 # Valores válidos para los campos controlados
 TIPOS_USUARIO = ("emprendedora", "cliente", "admin")
