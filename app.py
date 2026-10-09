@@ -541,10 +541,13 @@ def eliminar_usuario_definitivo(email_objetivo: str):
 def mostrar_aviso_privacidad():
     with st.expander("🔒 **Aviso de Privacidad Simplificado (Haz clic para leer)**"):
         st.markdown("""
-        **EMPODER-ARTE MÉXICO** informa que los datos personales recabados (incluyendo la Clave Única de Registro de Población **CURP** y la fotografía de su identificación oficial **INE**) serán utilizados única y exclusivamente para las siguientes finalidades:
-        1. **Verificación de Identidad**: Validar la autenticidad de los perfiles que se integran a la Red Nacional de Emprendedoras para garantizar la seguridad de la comunidad.
-        2. **Cifrado de Información**: Sus datos personales sensibles son **encriptados mediante algoritmos criptográficos AES-128 (Fernet)** antes de almacenarse en nuestras bases de datos, evitando cualquier acceso indebido.
-        3. **No Transferencia**: Sus datos no serán vendidos, compartidos ni transferidos a ningún tercero ajeno a la administración oficial de la plataforma.
+        **EMPODER-ARTE MÉXICO** informa su política actualizada de tratamiento de datos personales:
+        1. **Único dato sensible recabado**: Solo se solicita la **fotografía de la identificación oficial (INE)** a las **emprendedoras**, con la única finalidad de **verificar su identidad** antes de integrarse a la Red Nacional.
+        2. **Ya NO se solicita la CURP**: Hemos eliminado por completo la captura de la Clave Única de Registro de Población (CURP) para cualquier tipo de usuaria.
+        3. **Clientes sin documentos**: Las **clientes NO aportan INE ni CURP**; se registran únicamente con sus datos básicos de contacto.
+        4. **Almacenamiento cifrado**: La imagen del INE se guarda **cifrada mediante algoritmos criptográficos AES-128 (Fernet)**; es de uso interno exclusivo para verificación de identidad y nunca se muestra públicamente.
+        5. **No transferencia a terceros**: Sus datos no serán vendidos, compartidos ni transferidos a ningún tercero ajeno a la administración oficial de la plataforma.
+        6. **Aceptación obligatoria**: Marcar la casilla de aceptación de este Aviso de Privacidad es **obligatorio** para poder completar cualquier registro.
         """)
 
 # Inicialización de usuarios base y verificación de sesión diaria
@@ -1003,12 +1006,42 @@ with pestañas[0]:
         (df_emprendedoras["Tipo_Oferta"] == "Servicios") & 
         (df_emprendedoras["Estado_Aprobacion"] == "Aprobado")
     ].copy()
-    
+
+    # --- MOTOR DE BÚSQUEDA DEL DIRECTORIO (texto + filtros por categoría y estado) ---
+    # Se replica el patrón del Marketplace para mantener coherencia visual de marca.
+    cats_db_dir = cargar_categorias_db()
+    cats_dir = cats_db_dir.get("servicios", CATEGORIAS_SERVICIOS_BASE)
+    col_bd1, col_bd2, col_bd3 = st.columns([2, 1.5, 1.5])
+    with col_bd1:
+        buscar_dir = st.text_input("🔍 Buscar emprendedora, negocio o categoría:", value="", key="dir_buscar")
+    with col_bd2:
+        filtro_cat_dir = st.selectbox("Categoría:", ["Todas"] + cats_dir, key="dir_filtro_cat")
+    with col_bd3:
+        filtro_est_dir = st.selectbox("Estado:", ["Todos"] + ESTADOS_MEXICO, key="dir_filtro_est")
+
+    # Filtro de texto case-insensitive sobre Nombre, Negocio, Categoria y Descripcion.
+    if buscar_dir:
+        mask_txt = (
+            df_servicios["Nombre"].astype(str).str.contains(buscar_dir, case=False, na=False)
+            | df_servicios["Negocio"].astype(str).str.contains(buscar_dir, case=False, na=False)
+            | df_servicios["Categoria"].astype(str).str.contains(buscar_dir, case=False, na=False)
+            | df_servicios["Descripcion"].astype(str).str.contains(buscar_dir, case=False, na=False)
+        )
+        df_servicios = df_servicios[mask_txt]
+    if filtro_cat_dir != "Todas":
+        df_servicios = df_servicios[df_servicios["Categoria"] == filtro_cat_dir]
+    if filtro_est_dir != "Todos":
+        df_servicios = df_servicios[df_servicios["Estado"] == filtro_est_dir]
+
     df_evals = cargar_evaluaciones()
     df_lives_grab = cargar_lives_grabados()
 
     if df_servicios.empty:
-        st.info("Aún no hay emprendedoras aprobadas en el directorio.")
+        # Distingue "sin coincidencias" (hay filtros activos) de "aún no hay registros".
+        if buscar_dir or filtro_cat_dir != "Todas" or filtro_est_dir != "Todos":
+            st.info("No se encontraron emprendedoras que coincidan con tu búsqueda.")
+        else:
+            st.info("Aún no hay emprendedoras aprobadas en el directorio.")
     else:
         for idx, row in df_servicios.reset_index().iterrows():
             email_emp = row.get('Email', '')
@@ -1357,12 +1390,17 @@ with pestañas[2]:
         np.random.seed(42)
         df_mapa["lat_disp"] = df_mapa["lat"] + np.random.uniform(-0.03, 0.03, size=len(df_mapa))
         df_mapa["lon_disp"] = df_mapa["lon"] + np.random.uniform(-0.03, 0.03, size=len(df_mapa))
-        
+
+        # Paleta de rosas de marca para distinguir puntos sin confundirlos (RGBA, alpha ~200).
+        gama_rosa = [[248, 187, 208, 200], [244, 143, 177, 200], [239, 40, 154, 200], [216, 27, 96, 200]]
+        df_mapa = df_mapa.reset_index(drop=True)
+        df_mapa["color"] = [gama_rosa[i % len(gama_rosa)] for i in range(len(df_mapa))]
+
         capa_puntos_rosa = pdk.Layer(
             "ScatterplotLayer",
             data=df_mapa,
             get_position=["lon_disp", "lat_disp"],
-            get_color=[239, 40, 154, 210],
+            get_fill_color="color",
             get_radius=30000,
             pickable=True,
             radius_min_pixels=8,
@@ -1535,29 +1573,26 @@ with pestañas[4]:
             email_c = st.text_input("Correo Electrónico").strip().lower()
             pass_c = st.text_input("Crea una Contraseña para tu cuenta", type="password")
             cel_c = st.text_input("Número de Celular / WhatsApp")
-            curp_c_val = st.text_input("Clave CURP Oficial (18 caracteres)").strip().upper()
             estado_c = st.selectbox("Estado donde te ubicas", ESTADOS_MEXICO)
             
             st.write("<b>📸 Foto de Perfil:</b>", unsafe_allow_html=True)
             foto_c_upload = st.file_uploader("Subir Foto de Perfil", type=["jpg", "png", "jpeg", "webp"], key="c_foto_reg")
-            
-            st.write("<b>🪪 Documento Oficial INE (Validación de Identidad):</b>", unsafe_allow_html=True)
-            ine_c_upload = st.file_uploader("Subir Foto de tu INE (Frente o Reverso)", type=["jpg", "png", "jpeg", "pdf"], key="c_ine_reg")
-            
-            acepta_privacidad_c = st.checkbox("☑️ Acepto de forma obligatoria el Aviso de Privacidad y el tratamiento cifrado de mi CURP e INE.", key="priv_c")
+            # Las clientes NO aportan CURP ni INE (política de privacidad actualizada).
+
+            # Aviso de privacidad obligatorio mostrado junto a la casilla de aceptación.
+            mostrar_aviso_privacidad()
+            acepta_privacidad_c = st.checkbox("☑️ He leído y acepto el Aviso de Privacidad", key="priv_c")
             btn_reg_c = st.form_submit_button("✨ Registrarme como Cliente Gratis")
             
             if btn_reg_c:
                 if not acepta_privacidad_c:
-                    st.error("⚠️ Debes aceptar obligatoriamente el Aviso de Privacidad marcando la casilla antes de enviar tu registro.")
-                elif not (email_c and pass_c and nom_c and cel_c and curp_c_val):
+                    st.error("Debes aceptar el Aviso de Privacidad para completar tu registro.")
+                elif not (email_c and pass_c and nom_c and cel_c):
                     st.error("Por favor completa todos los campos requeridos.")
                 else:
                     usuarios_db = cargar_usuarios_db()
                     if email_c in usuarios_db or not df_emprendedoras[df_emprendedoras["Email"] == email_c].empty:
                         st.error("Este correo ya está registrado en la plataforma.")
-                    elif len(curp_c_val) != 18:
-                        st.error("La CURP debe contener exactamente 18 caracteres.")
                     else:
                         # SQLite PRIMERO (barrera atómica): si falla, abortar sin huérfanos en CSV/JSON.
                         resultado_sql = db.registrar_usuario(
@@ -1568,11 +1603,8 @@ with pestañas[4]:
                             st.error(resultado_sql["mensaje"])
                             st.stop()
                         foto_base64 = convertir_imagen_a_base64(foto_c_upload)
-                        ine_status = "Subido / En Revisión" if ine_c_upload is not None else "Pendiente"
                         lat, lon = COORDENADAS_ESTADOS.get(estado_c, (23.6345, -102.5528))
-                        
-                        curp_encriptada = cifrar_dato(curp_c_val)
-                        ine_encriptada = cifrar_dato(ine_status)
+                        # La cliente no aporta INE ni CURP: se neutralizan esos campos.
                         
                         nueva_row = pd.DataFrame([{
                             "Email": email_c, "Celular": cel_c, "Nombre": nom_c, "Negocio": "Cliente Visitante",
@@ -1581,8 +1613,8 @@ with pestañas[4]:
                             "Descripcion": "Cliente de la comunidad", "Historia": "Cliente activa.", "Estado_Pago": "Gratis",
                             "Metodo_Pago": "N/A", "Estado_Aprobacion": "Aprobado",
                             "Foto_Perfil": foto_base64,
-                            "INE_Doc": ine_encriptada,
-                            "CURP_Valor": curp_encriptada,
+                            "INE_Doc": "N/A", "CURP_Doc": "N/A",
+                            "CURP_Valor": cifrar_dato("N/A"),
                             "lat": lat, "lon": lon
                         }])
                         df_emprendedoras = pd.concat([df_emprendedoras, nueva_row], ignore_index=True)
@@ -1624,7 +1656,6 @@ with pestañas[4]:
             cel_g = st.text_input("Número de Celular / WhatsApp")
             nombre_g = st.text_input("Tu Nombre Completo")
             negocio_g = st.text_input("Nombre de tu Emprendimiento")
-            curp_g_val = st.text_input("Clave CURP Oficial (18 caracteres)").strip().upper()
             
             col_g1, col_g2 = st.columns(2)
             with col_g1:
@@ -1643,13 +1674,15 @@ with pestañas[4]:
             st.write("<b>🪪 Documento Oficial INE (Validación de Identidad):</b>", unsafe_allow_html=True)
             ine_g_upload = st.file_uploader("Subir Foto de tu INE (Frente o Reverso)", type=["jpg", "png", "jpeg", "pdf"], key="g_ine_reg")
             
-            acepta_privacidad_g = st.checkbox("☑️ Acepto de forma obligatoria el Aviso de Privacidad y el tratamiento cifrado de mi CURP e INE.", key="priv_g")
+            # Aviso de privacidad obligatorio mostrado junto a la casilla de aceptación.
+            mostrar_aviso_privacidad()
+            acepta_privacidad_g = st.checkbox("☑️ He leído y acepto el Aviso de Privacidad", key="priv_g")
             btn_reg_g = st.form_submit_button("🌸 Enviar Registro Gratis para Revisión")
             
             if btn_reg_g:
                 if not acepta_privacidad_g:
-                    st.error("⚠️ Debes aceptar obligatoriamente el Aviso de Privacidad marcando la casilla antes de enviar tu registro.")
-                elif not (email_g and pass_g and nombre_g and negocio_g and cel_g and curp_g_val):
+                    st.error("Debes aceptar el Aviso de Privacidad para completar tu registro.")
+                elif not (email_g and pass_g and nombre_g and negocio_g and cel_g):
                     st.error("Por favor completa todos los campos obligatorios.")
                 else:
                     cat_final_g = cat_nueva_g.strip() if categoria_sel_g == "➕ Agregar nueva categoría..." and cat_nueva_g.strip() else categoria_sel_g
@@ -1659,8 +1692,6 @@ with pestañas[4]:
                     usuarios_db = cargar_usuarios_db()
                     if email_g in usuarios_db or not df_emprendedoras[df_emprendedoras["Email"] == email_g].empty:
                         st.error("Este correo ya está registrado.")
-                    elif len(curp_g_val) != 18:
-                        st.error("La CURP debe contener exactamente 18 caracteres.")
                     else:
                         # SQLite PRIMERO (barrera atómica): si falla, abortar sin huérfanos en CSV/JSON.
                         resultado_sql = db.registrar_usuario(
@@ -1671,12 +1702,14 @@ with pestañas[4]:
                             st.error(resultado_sql["mensaje"])
                             st.stop()
                         foto_base64 = convertir_imagen_a_base64(foto_g_upload)
-                        ine_status = "Subido / En Revisión" if ine_g_upload is not None else "Pendiente"
                         estado_registro = "Aprobado" if email_g == CORREO_ADMIN else "Pendiente"
                         lat, lon = COORDENADAS_ESTADOS.get(estado_g, (23.6345, -102.5528))
                         
-                        curp_encriptada = cifrar_dato(curp_g_val)
-                        ine_encriptada = cifrar_dato(ine_status)
+                        # La FOTO del INE se convierte a base64 y se CIFRA (AES-128/Fernet); nunca en texto plano.
+                        if ine_g_upload is not None:
+                            ine_encriptada = cifrar_dato(convertir_imagen_a_base64(ine_g_upload))
+                        else:
+                            ine_encriptada = cifrar_dato("Pendiente")
                         
                         nueva_row = pd.DataFrame([{
                             "Email": email_g, "Celular": cel_g, "Nombre": nombre_g, "Negocio": negocio_g,
@@ -1685,8 +1718,8 @@ with pestañas[4]:
                             "Descripcion": desc_g, "Historia": historia_g, "Estado_Pago": "Emprendedora Gratis", "Metodo_Pago": "Gratis",
                             "Estado_Aprobacion": estado_registro,
                             "Foto_Perfil": foto_base64,
-                            "INE_Doc": ine_encriptada,
-                            "CURP_Valor": curp_encriptada,
+                            "INE_Doc": ine_encriptada, "CURP_Doc": "N/A",
+                            "CURP_Valor": cifrar_dato("N/A"),
                             "lat": lat, "lon": lon
                         }])
                         df_emprendedoras = pd.concat([df_emprendedoras, nueva_row], ignore_index=True)
@@ -1728,7 +1761,6 @@ with pestañas[4]:
             cel_v = st.text_input("Número de Celular / WhatsApp")
             nombre_v = st.text_input("Tu Nombre Completo")
             negocio_v = st.text_input("Nombre de tu Emprendimiento")
-            curp_v_val = st.text_input("Clave CURP Oficial (18 caracteres)").strip().upper()
             
             col_v1, col_v2 = st.columns(2)
             with col_v1:
@@ -1748,13 +1780,15 @@ with pestañas[4]:
             st.write("<b>🪪 Documento Oficial INE (Validación de Identidad):</b>", unsafe_allow_html=True)
             ine_v_upload = st.file_uploader("Subir Foto de tu INE (Frente o Reverso)", type=["jpg", "png", "jpeg", "pdf"], key="v_ine_reg")
             
-            acepta_privacidad_v = st.checkbox("☑️ Acepto de forma obligatoria el Aviso de Privacidad y el tratamiento cifrado de mi CURP e INE.", key="priv_v")
+            # Aviso de privacidad obligatorio mostrado junto a la casilla de aceptación.
+            mostrar_aviso_privacidad()
+            acepta_privacidad_v = st.checkbox("☑️ He leído y acepto el Aviso de Privacidad", key="priv_v")
             btn_reg_v = st.form_submit_button("💳 Registrar Emprendimiento VIP ($99 MXN) y Enviar a Revisión")
             
             if btn_reg_v:
                 if not acepta_privacidad_v:
-                    st.error("⚠️ Debes aceptar obligatoriamente el Aviso de Privacidad marcando la casilla antes de enviar tu registro.")
-                elif not (email_v and pass_v and nombre_v and negocio_v and cel_v and curp_v_val):
+                    st.error("Debes aceptar el Aviso de Privacidad para completar tu registro.")
+                elif not (email_v and pass_v and nombre_v and negocio_v and cel_v):
                     st.error("Por favor completa todos los campos requeridos.")
                 else:
                     cat_final_v = cat_nueva_v.strip() if categoria_sel_v == "➕ Agregar nueva categoría..." and cat_nueva_v.strip() else categoria_sel_v
@@ -1764,8 +1798,6 @@ with pestañas[4]:
                     usuarios_db = cargar_usuarios_db()
                     if email_v in usuarios_db or not df_emprendedoras[df_emprendedoras["Email"] == email_v].empty:
                         st.error("Este correo ya está registrado.")
-                    elif len(curp_v_val) != 18:
-                        st.error("La CURP debe contener exactamente 18 caracteres.")
                     else:
                         # SQLite PRIMERO (barrera atómica): si falla, abortar sin huérfanos en CSV/JSON.
                         resultado_sql = db.registrar_usuario(
@@ -1776,12 +1808,14 @@ with pestañas[4]:
                             st.error(resultado_sql["mensaje"])
                             st.stop()
                         foto_base64 = convertir_imagen_a_base64(foto_v_upload)
-                        ine_status = "Subido / En Revisión" if ine_v_upload is not None else "Pendiente"
                         estado_registro = "Aprobado" if email_v == CORREO_ADMIN else "Pendiente"
                         lat, lon = COORDENADAS_ESTADOS.get(estado_v, (23.6345, -102.5528))
                         
-                        curp_encriptada = cifrar_dato(curp_v_val)
-                        ine_encriptada = cifrar_dato(ine_status)
+                        # La FOTO del INE se convierte a base64 y se CIFRA (AES-128/Fernet); nunca en texto plano.
+                        if ine_v_upload is not None:
+                            ine_encriptada = cifrar_dato(convertir_imagen_a_base64(ine_v_upload))
+                        else:
+                            ine_encriptada = cifrar_dato("Pendiente")
                         
                         nueva_row = pd.DataFrame([{
                             "Email": email_v, "Celular": cel_v, "Nombre": nombre_v, "Negocio": negocio_v,
@@ -1790,8 +1824,8 @@ with pestañas[4]:
                             "Descripcion": desc_v, "Historia": historia_v, "Estado_Pago": "VIP", "Metodo_Pago": metodo_v,
                             "Estado_Aprobacion": estado_registro,
                             "Foto_Perfil": foto_base64,
-                            "INE_Doc": ine_encriptada,
-                            "CURP_Valor": curp_encriptada,
+                            "INE_Doc": ine_encriptada, "CURP_Doc": "N/A",
+                            "CURP_Valor": cifrar_dato("N/A"),
                             "lat": lat, "lon": lon
                         }])
                         df_emprendedoras = pd.concat([df_emprendedoras, nueva_row], ignore_index=True)
@@ -2221,7 +2255,15 @@ if st.session_state["es_admin"]:
             st.markdown("<h4 class='brand-font' style='color:#D81B60;'>📄 Registros y Descifrado de Seguridad</h4>", unsafe_allow_html=True)
             df_admin_ver = df_emprendedoras.copy()
             df_admin_ver["CURP_Descifrada"] = df_admin_ver["CURP_Valor"].apply(descifrar_dato)
-            df_admin_ver["INE_Estado"] = df_admin_ver["INE_Doc"].apply(descifrar_dato)
+
+            # INE_Doc ahora puede contener la FOTO del INE cifrada (base64). No volcamos el
+            # contenido en la tabla: mostramos una etiqueta corta y verificable por admin.
+            def _ine_label(v):
+                d = descifrar_dato(v)
+                if isinstance(d, str) and (d.startswith("data:image") or len(d) > 100):
+                    return "📷 INE cifrado (verificable por admin)"
+                return d
+            df_admin_ver["INE_Estado"] = df_admin_ver["INE_Doc"].apply(_ine_label)
             
             st.dataframe(
                 df_admin_ver[["Nombre", "Email", "Negocio", "Estado_Pago", "Estado_Aprobacion", "CURP_Descifrada", "INE_Estado"]],
