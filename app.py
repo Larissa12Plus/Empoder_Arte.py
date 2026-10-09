@@ -1557,7 +1557,8 @@ with pestañas[3]:
 # --- PESTAÑA 5: REGISTRO / UNIRME CON CASILLA OBLIGATORIA DE AVISO DE PRIVACIDAD Y CATEGORÍAS DINÁMICAS ---
 with pestañas[4]:
     st.markdown('<h3 class="brand-font" style="color:#D81B60;">📝 Únete a la Comunidad Empoder-Arte</h3>', unsafe_allow_html=True)
-    mostrar_aviso_privacidad()
+    # El Aviso de Privacidad se muestra SOLO en los registros de emprendedora (que suben INE),
+    # no en el registro de cliente (no aporta datos sensibles).
     cats_db = cargar_categorias_db()
     
     tab_reg_c, tab_reg_eg, tab_reg_ev = st.tabs([
@@ -1577,17 +1578,12 @@ with pestañas[4]:
             
             st.write("<b>📸 Foto de Perfil:</b>", unsafe_allow_html=True)
             foto_c_upload = st.file_uploader("Subir Foto de Perfil", type=["jpg", "png", "jpeg", "webp"], key="c_foto_reg")
-            # Las clientes NO aportan CURP ni INE (política de privacidad actualizada).
+            # Las clientes NO aportan CURP ni INE, por lo que NO ven ni aceptan el Aviso de Privacidad.
 
-            # Aviso de privacidad obligatorio mostrado junto a la casilla de aceptación.
-            mostrar_aviso_privacidad()
-            acepta_privacidad_c = st.checkbox("☑️ He leído y acepto el Aviso de Privacidad", key="priv_c")
             btn_reg_c = st.form_submit_button("✨ Registrarme como Cliente Gratis")
             
             if btn_reg_c:
-                if not acepta_privacidad_c:
-                    st.error("Debes aceptar el Aviso de Privacidad para completar tu registro.")
-                elif not (email_c and pass_c and nom_c and cel_c):
+                if not (email_c and pass_c and nom_c and cel_c):
                     st.error("Por favor completa todos los campos requeridos.")
                 else:
                     usuarios_db = cargar_usuarios_db()
