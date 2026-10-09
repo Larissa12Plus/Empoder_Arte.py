@@ -383,8 +383,10 @@ def cargar_productos():
         df_p = pd.read_sql("SELECT * FROM productos", db._get_engine())
         # Se CONSERVA la columna 'id' (PK de Postgres) para poder editar/eliminar
         # un producto de forma fiable por su id real, no por índice de pandas.
+        # IMPORTANTE: si la tabla está VACÍA se devuelve un DataFrame vacío (NO se
+        # reinyectan productos de ejemplo), para que un producto eliminado NO reaparezca.
         if df_p.empty:
-            return df_base_prods[columnas_esperadas]
+            return pd.DataFrame(columns=["id"] + columnas_esperadas)
         if "Estado_Aprobacion" not in df_p.columns:
             df_p["Estado_Aprobacion"] = "Aprobado"
         if "Estado" not in df_p.columns:
@@ -394,7 +396,8 @@ def cargar_productos():
         cols_salida = (["id"] if "id" in df_p.columns else []) + columnas_esperadas
         return df_p[cols_salida]
     except Exception:
-        return df_base_prods[columnas_esperadas]
+        # Si la BD no responde, devolver vacío (no datos de ejemplo que confundan).
+        return pd.DataFrame(columns=["id"] + columnas_esperadas)
 
 def cargar_chat_live():
     columnas_esperadas = ["Hora", "Usuario", "Mensaje"]
