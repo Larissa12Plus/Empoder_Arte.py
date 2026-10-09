@@ -2092,18 +2092,51 @@ with pestañas[8]:
                 unsafe_allow_html=True,
             )
         elif db.tiene_acceso_vip(usuario_sql["id"]):
-            # ESTADO C — acceso VIP vigente: contenido premium decorado (placeholder).
+            # ESTADO C — acceso VIP vigente: centro de accesos premium (Lives, Mi Oficina, Educación).
             st.markdown(
                 "<div style='background:linear-gradient(135deg,#D81B60,#EF289A);padding:28px;"
-                "border-radius:16px;color:white;'>"
+                "border-radius:16px;color:white;margin-bottom:18px;'>"
                 "<h2 class='brand-font'>👑 Bienvenida a tu Zona VIP ✨</h2>"
-                "<p>Tienes acceso premium activo. Aquí verás tus beneficios exclusivos.</p></div>",
+                "<p style='margin:6px 0 0 0;'>Tu suscripción está activa. Desde aquí accedes a tus "
+                "tres beneficios exclusivos. Ábrelos en las pestañas de arriba.</p></div>",
                 unsafe_allow_html=True,
             )
-            st.success("✨ Tu suscripción VIP está activa.")
-            st.markdown("- 🎥 Transmisiones y grabaciones exclusivas\n"
-                        "- 📈 Métricas y herramientas de Mi Oficina\n"
-                        "- 🛍️ Publicación destacada en el Marketplace")
+
+            # Nota: Streamlit no permite cambiar de pestaña con un botón de forma nativa,
+            # por eso cada tarjeta indica claramente en qué pestaña superior está la sección.
+            st.markdown(
+                """
+                <style>
+                .vip-card {background:#FFFFFF;border:2px solid #F8BBD0;border-left:6px solid #EF289A;
+                           border-radius:16px;padding:20px 22px;margin-bottom:16px;
+                           box-shadow:0 4px 14px rgba(216,27,96,0.12);}
+                .vip-card h3 {color:#D81B60;margin:0 0 6px 0;}
+                .vip-card p {color:#555;margin:0 0 8px 0;font-size:14px;}
+                .vip-pill {display:inline-block;background:#FFF0F5;color:#D81B60;font-weight:bold;
+                           font-size:13px;padding:6px 14px;border-radius:20px;border:1px dashed #EF289A;}
+                </style>
+
+                <div class="vip-card">
+                    <h3 class="brand-font">🔴 Transmisiones en Vivo</h3>
+                    <p>Inicia tus propios lives para la comunidad y revive tus grabaciones recientes.</p>
+                    <span class="vip-pill">👉 Abre la pestaña «🔴 Transmisión En Vivo» arriba</span>
+                </div>
+
+                <div class="vip-card">
+                    <h3 class="brand-font">💼 Mi Oficina</h3>
+                    <p>Tu panel completo: métricas financieras, ventas, agenda de citas y tareas pendientes.</p>
+                    <span class="vip-pill">👉 Abre la pestaña «💼 Mi Oficina» arriba</span>
+                </div>
+
+                <div class="vip-card">
+                    <h3 class="brand-font">📚 Educación y Capacitación</h3>
+                    <p>Cursos, talleres y material de formación exclusivo para emprendedoras VIP.</p>
+                    <span class="vip-pill">👉 Abre la pestaña «📚 Educación» arriba</span>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+            st.success("✨ Tu suscripción VIP está activa. Ya tienes acceso a las tres secciones.")
         else:
             # ESTADO D — existe pero sin acceso (inactivo/pendiente/vencido).
             st.markdown(
