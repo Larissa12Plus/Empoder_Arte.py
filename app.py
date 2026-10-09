@@ -1132,6 +1132,21 @@ with pestañas[0]:
 # --- PESTAÑA 2: MARKETPLACE CON EDICIÓN Y ELIMINACIÓN DE PUBLICACIONES Y CATEGORÍAS DINÁMICAS ---
 with pestañas[1]:
     st.markdown('<h3 class="brand-font" style="color:#D81B60;">🛍️ Marketplace Nacional Empoder-Arte</h3>', unsafe_allow_html=True)
+
+    # DIAGNÓSTICO DE CONEXIÓN (visible SOLO para la administradora).
+    # Confirma de un vistazo si la base de datos Supabase responde. Si falla, las
+    # ediciones/eliminaciones de productos no se pueden guardar.
+    if st.session_state.get("es_admin"):
+        try:
+            import pandas as _pd_diag
+            _n = _pd_diag.read_sql("SELECT count(*) AS n FROM productos", db._get_engine())
+            _total = int(_n.iloc[0]["n"])
+            st.success(f"🟢 Conexión a Supabase OK — {_total} producto(s) en la base. (Mensaje visible solo para ti como admin.)")
+        except Exception as _e_diag:
+            st.error("🔴 SIN conexión a la base de datos Supabase. Las eliminaciones/ediciones NO se guardarán. "
+                     "Revisa que DB_URL esté configurado en Streamlit Cloud → Settings → Secrets.")
+            st.caption(f"Detalle técnico (solo admin): {type(_e_diag).__name__}: {str(_e_diag)[:200]}")
+
     df_prods_todos = cargar_productos()
     cats_db = cargar_categorias_db()
     lista_prods_cats = cats_db.get("productos", CATEGORIAS_PRODUCTOS_BASE)
