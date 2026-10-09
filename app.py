@@ -1256,7 +1256,16 @@ with pestañas[1]:
                 # BOTONES EXCLUSIVOS DE EDICIÓN Y ELIMINACIÓN PARA PROPIETARIA Y ADMINISTRADORA
                 if es_duena_o_admin:
                     col_b_edit, col_b_del = st.columns(2)
-                    idx_orig = row["index"] if "index" in row else idx
+                    # Identificar la fila REAL en df_prods_todos por contenido (no por índice
+                    # de pandas, que es inestable al venir los datos de Postgres y estar
+                    # filtrados). Se busca por producto + vendedora + precio.
+                    _mask_prod = (
+                        (df_prods_todos["Email_Emprendedora"] == row["Email_Emprendedora"]) &
+                        (df_prods_todos["Producto"] == row["Producto"]) &
+                        (df_prods_todos["Precio"] == row["Precio"])
+                    )
+                    _idxs = df_prods_todos.index[_mask_prod].tolist()
+                    idx_orig = _idxs[0] if _idxs else None
                     
                     with col_b_edit:
                         with st.popover("✏️ Editar"):
@@ -1297,10 +1306,15 @@ with pestañas[1]:
 
                     with col_b_del:
                         if st.button("🗑️ Eliminar", key=f"btn_del_prod_{idx}"):
-                            df_prods_todos = df_prods_todos.drop(index=idx_orig)
-                            guardar_datos(df_prods_todos, ARCHIVO_PRODUCTOS)
-                            st.success("¡Publicación eliminada correctamente!")
-                            st.rerun()
+                            if idx_orig is None:
+                                st.error("No se pudo localizar el producto a eliminar. Recarga la página e intenta de nuevo.")
+                            else:
+                                # Borrar la fila real por su índice en df_prods_todos y reescribir
+                                # la tabla 'productos' en Postgres (guardar_datos es el dispatcher).
+                                df_prods_todos = df_prods_todos.drop(index=idx_orig).reset_index(drop=True)
+                                guardar_datos(df_prods_todos, ARCHIVO_PRODUCTOS)
+                                st.success("¡Publicación eliminada correctamente!")
+                                st.rerun()
 
 # --- PESTAÑA 3: MAPA INTERACTIVO NACIONAL ---
 with pestañas[2]:
