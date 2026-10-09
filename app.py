@@ -830,13 +830,13 @@ with st.sidebar:
     st.markdown("<h4 style='color:white;' class='brand-font'>⚙️ Herramientas Fundadora</h4>", unsafe_allow_html=True)
 
     # 1. REGISTRO USUARIO VIP GRATIS
-    with st.popover("⭐ Registro VIP Directo (Sin Pago)"):
-        st.markdown("<b style='color:#D81B60;'>Alta de Usuario VIP Gratis</b>", unsafe_allow_html=True)
+    with st.popover("⭐ Registro Premium Directo (Sin Pago)"):
+        st.markdown("<b style='color:#D81B60;'>Alta de Usuaria Premium Gratis</b>", unsafe_allow_html=True)
         with st.form("form_alta_vip_directa"):
             nom_vip_s = st.text_input("Nombre Completo")
             email_vip_s = st.text_input("Correo Electrónico").strip().lower()
             pass_vip_s = st.text_input("Contraseña Inicial", type="password")
-            btn_crear_vip_s = st.form_submit_button("✨ Otorgar Acceso VIP Gratis")
+            btn_crear_vip_s = st.form_submit_button("✨ Otorgar Acceso Premium Gratis")
 
             if btn_crear_vip_s and nom_vip_s and email_vip_s and pass_vip_s:
                 # SQLite es la fuente de verdad: registrar PRIMERO (plan VIP activo).
@@ -871,7 +871,7 @@ with st.sidebar:
                         df_e = pd.concat([df_e, nueva_u], ignore_index=True)
                         guardar_datos(df_e, ARCHIVO_CSV)
 
-                    st.success(f"¡Usuario VIP {nom_vip_s} creado exitosamente!")
+                    st.success(f"¡Usuaria Premium {nom_vip_s} creada exitosamente!")
                     st.rerun()
 
     # 2. RESETEAR CONTRASEÑA RÁPIDA
@@ -907,19 +907,17 @@ with st.sidebar:
 # ---------------------------------------------------------
 # 5. PESTAÑAS PRINCIPALES
 # ---------------------------------------------------------
-# Orden deseado: la Zona VIP queda en la SEGUNDA posición, justo después del Directorio.
+# Orden deseado: la Zona Premium queda en la SEGUNDA posición, justo después del Directorio.
 # Los bloques de contenido se referencian por NOMBRE (ver tab_por_nombre más abajo),
 # así que reordenar esta lista basta: ningún índice literal depende del orden.
 titulos_pestañas = [
     "🌸 Directorio de Servicios",
-    "👑 Zona VIP / Exclusivo",      # movida aquí (antes iba al final)
+    "👑 Zona Premium / Exclusivo",  # renombrada (antes "Zona VIP"); segunda posición
     "🛍️ Marketplace",
     "🗺️ Mapa México",
     "🔴 Transmisión En Vivo",
     "📝 Registro / Unirme",
     "🙏 Petición Oración",
-    "💼 Mi Oficina",
-    "📚 Educación",
 ]
 # Dashboard Admin: condicional, siempre al final y solo visible para la administradora.
 if st.session_state["es_admin"]:
@@ -1452,7 +1450,7 @@ with tab_por_nombre["🔴 Transmisión En Vivo"]:
     
     with col_live_main:
         if es_vip_o_admin:
-            with st.expander("🎥 PANEL DE CONTROL DE TRANSMISIÓN EN VIVO (EXCLUSIVO VIP)", expanded=True):
+            with st.expander("🎥 PANEL DE CONTROL DE TRANSMISIÓN EN VIVO (EXCLUSIVO PREMIUM)", expanded=True):
                 st.write("<b>Presiona para gestionar el estado de tu transmisión en vivo:</b>", unsafe_allow_html=True)
                 titulo_live_input = st.text_input("Título de la transmisión:", value="Especial de Emprendimiento")
                 
@@ -1503,16 +1501,16 @@ with tab_por_nombre["🔴 Transmisión En Vivo"]:
                         st.success("✨ Señal capturada y emitida a la comunidad.")
         else:
             if not st.session_state["sesion_activa"]:
-                st.info("💡 Solo las Emprendedoras VIP pueden iniciar transmisiones en vivo. ¡Inicia sesión si tienes cuenta VIP!")
+                st.info("💡 Solo las Emprendedoras Premium pueden iniciar transmisiones en vivo. ¡Inicia sesión si tienes cuenta Premium!")
             else:
-                st.info(f"👤 Hola **{st.session_state['usuario_logueado']}**: Tu nivel actual es **{st.session_state['rol_usuario']}**. La función de transmitir en vivo es exclusiva para miembros VIP.")
+                st.info(f"👤 Hola **{st.session_state['usuario_logueado']}**: Tu nivel actual es **{st.session_state['rol_usuario']}**. La función de transmitir en vivo es exclusiva para miembros Premium.")
         
         st.write("---")
         
         st.markdown("<h4 class='brand-font' style='color:#D81B60;'>📺 Pantalla en Vivo de la Comunidad</h4>", unsafe_allow_html=True)
         
         if st.session_state.get("transmitiendo_ahora") and st.session_state.get("stream_frame_activo"):
-            emisor = st.session_state.get("nombre_emisor_live", "Emprendedora VIP")
+            emisor = st.session_state.get("nombre_emisor_live", "Emprendedora Premium")
             st.markdown(f"""
                 <div style="background-color: #000000; padding: 15px; border-radius: 16px; text-align: center; border: 3px solid #EF289A;">
                     <div style="background-color: #D81B60; color: white; padding: 5px 15px; border-radius: 20px; display: inline-block; font-weight: bold; font-size: 13px; margin-bottom: 10px;">
@@ -1526,7 +1524,7 @@ with tab_por_nombre["🔴 Transmisión En Vivo"]:
             st.markdown("""
                 <div style="background-color: #222222; padding: 60px 20px; border-radius: 16px; text-align: center; border: 2px solid #F8BBD0; color: white;">
                     <h3 class="brand-font" style="color: #FF80AB; margin-bottom: 10px;">📺 En Espera de Transmisión</h3>
-                    <p style="color: #CCCCCC; font-size: 14px;">En este momento no hay ninguna Emprendedora VIP transmitiendo en vivo.<br>Utiliza el chat lateral para comunicarte con la comunidad.</p>
+                    <p style="color: #CCCCCC; font-size: 14px;">En este momento no hay ninguna Emprendedora Premium transmitiendo en vivo.<br>Utiliza el chat lateral para comunicarte con la comunidad.</p>
                 </div>
             """, unsafe_allow_html=True)
     with col_chat_side:
@@ -1570,7 +1568,7 @@ with tab_por_nombre["📝 Registro / Unirme"]:
     tab_reg_c, tab_reg_eg, tab_reg_ev = st.tabs([
         "👤 Registro Cliente Gratis", 
         "🌸 Registro Emprendedora Gratis", 
-        "💳 Registro Emprendedora VIP ($99 MXN)"
+        "💳 Registro Emprendedora Premium ($99 MXN)"
     ])
     
     # REGISTRO CLIENTE GRATIS
@@ -1746,7 +1744,7 @@ with tab_por_nombre["📝 Registro / Unirme"]:
 
     # REGISTRO EMPRENDEDORA VIP CON CATEGORÍA MANUALLY
     with tab_reg_ev:
-        st.markdown("<b style='color:#D81B60;'>💳 Registro Emprendedora VIP ($99 MXN/mes) — Acceso Completo + Transmisiones en Vivo</b>", unsafe_allow_html=True)
+        st.markdown("<b style='color:#D81B60;'>💳 Registro Emprendedora Premium ($99 MXN/mes) — Acceso Completo + Transmisiones en Vivo</b>", unsafe_allow_html=True)
         tipo_oferta_v = st.radio("¿Qué ofrece tu negocio?", ["Servicios", "Productos"], horizontal=True, key="reg_v_tipo_pub")
         
         cats_disponibles_v = cats_db.get("servicios" if tipo_oferta_v == "Servicios" else "productos", [])
@@ -1785,7 +1783,7 @@ with tab_por_nombre["📝 Registro / Unirme"]:
             # Aviso de privacidad obligatorio mostrado junto a la casilla de aceptación.
             mostrar_aviso_privacidad()
             acepta_privacidad_v = st.checkbox("☑️ He leído y acepto el Aviso de Privacidad", key="priv_v")
-            btn_reg_v = st.form_submit_button("💳 Registrar Emprendimiento VIP ($99 MXN) y Enviar a Revisión")
+            btn_reg_v = st.form_submit_button("💳 Registrar Emprendimiento Premium ($99 MXN) y Enviar a Revisión")
             
             if btn_reg_v:
                 if not acepta_privacidad_v:
@@ -1847,7 +1845,7 @@ with tab_por_nombre["📝 Registro / Unirme"]:
                         st.session_state["rol_usuario"] = "VIP"
                         guardar_sesion_diaria(email_v, nombre_v, "VIP")
                         
-                        st.success("¡Registro VIP completado e inicio de sesión guardado para el día!")
+                        st.success("¡Registro Premium completado e inicio de sesión guardado para el día!")
                         st.rerun()
 
 # --- PESTAÑA: PETICIÓN DE ORACIÓN CON ÁREA Y CELULAR DE CONTACTO ---
@@ -1897,265 +1895,16 @@ with tab_por_nombre["🙏 Petición Oración"]:
             guardar_datos(df_oraciones, ARCHIVO_ORACIONES)
             st.success("🙏 ¡Tu petición ha sido recibida! Estaremos orando por ti.")
 
-# --- PESTAÑA: MI OFICINA (MÉTRICAS, AGENDA, TAREAS Y ELIMINACIÓN DE TRANSACCIONES) ---
-with tab_por_nombre["💼 Mi Oficina"]:
-    st.markdown('<h3 class="brand-font" style="color:#D81B60;">💼 Mi Oficina | Empoder-Arte</h3>', unsafe_allow_html=True)
-    
-    es_vip = st.session_state["sesion_activa"] and (
-        st.session_state["rol_usuario"] in ["VIP", "Admin", "Administradora"] or 
-        st.session_state["email_logueado"] == CORREO_ADMIN
-    )
-    
-    if not es_vip:
-        st.warning("🔒 Esta sección contiene herramientas avanzadas de gestión, inventario, métricas financieras, agenda y pendientes exclusivas para **Emprendedoras VIP**.")
-        st.info("Actualiza tu cuenta a VIP ($99 MXN/mes) para habilitar tu panel administrativo completo.")
-    else:
-        st.markdown("<p style='color:#555;'>Bienvenida a tu centro de control integral. Gestiona tus finanzas, coordina tus citas de negocio y organiza tus actividades pendientes.</p>", unsafe_allow_html=True)
-        
-        subtab_finanzas, subtab_agenda, subtab_tareas = st.tabs([
-            "📊 Métricas Financieras y Ventas",
-            "📅 Agenda de Citas y Cursos",
-            "✅ Lista de Pendientes (To-Do)"
-        ])
-        
-        email_actual = st.session_state["email_logueado"]
-        
-        # --- SUBPESTAÑA 1: FINANZAS, MÉTRICAS Y ELIMINACIÓN DE TRANSACCIONES ---
-        with subtab_finanzas:
-            df_finanzas = cargar_finanzas()
-            df_mis_finanzas = df_finanzas.copy() if st.session_state["es_admin"] else df_finanzas[df_finanzas["Email_Emprendedora"] == email_actual].copy()
-            
-            with st.expander("➕ REGISTRAR NUEVA TRANSACCIÓN (VENTA / GASTO)"):
-                with st.form("form_registro_finanzas"):
-                    col_f1, col_f2 = st.columns(2)
-                    with col_f1:
-                        fecha_t = st.date_input("Fecha", value=date.today(), key="fin_fecha")
-                        cliente_t = st.text_input("Cliente / Proveedor", placeholder="Ej. María López")
-                        tipo_t = st.selectbox("Tipo de Transacción", ["Ingreso (Venta)", "Egreso (Gasto)"])
-                    with col_f2:
-                        concepto_t = st.text_input("Concepto / Producto", placeholder="Ej. Servicio de Barbería / Insumos")
-                        monto_t = st.number_input("Monto ($ MXN)", min_value=1.0, value=150.0, step=10.0)
-                        
-                    btn_guardar_t = st.form_submit_button("💾 Registrar Transacción")
-                    
-                    if btn_guardar_t and concepto_t:
-                        nueva_t = pd.DataFrame([{
-                            "Fecha": fecha_t.strftime("%Y-%m-%d"),
-                            "Email_Emprendedora": email_actual,
-                            "Cliente": cliente_t if cliente_t else "General",
-                            "Concepto": concepto_t,
-                            "Monto": float(monto_t),
-                            "Tipo": tipo_t
-                        }])
-                        df_finanzas = pd.concat([df_finanzas, nueva_t], ignore_index=True)
-                        guardar_datos(df_finanzas, ARCHIVO_FINANZAS)
-                        st.success("¡Transacción registrada exitosamente!")
-                        st.rerun()
-            st.write("---")
-            
-            if df_mis_finanzas.empty:
-                st.info("Aún no tienes transacciones registradas. Utiliza el formulario superior para añadir tu primera venta.")
-            else:
-                df_ingresos = df_mis_finanzas[df_mis_finanzas["Tipo"] == "Ingreso (Venta)"]
-                df_egresos = df_mis_finanzas[df_mis_finanzas["Tipo"] == "Egreso (Gasto)"]
-                
-                total_ingresos = df_ingresos["Monto"].sum() if not df_ingresos.empty else 0.0
-                total_egresos = df_egresos["Monto"].sum() if not df_egresos.empty else 0.0
-                balance_neto = total_ingresos - total_egresos
-                num_ventas = len(df_ingresos)
-                ticket_promedio = total_ingresos / num_ventas if num_ventas > 0 else 0.0
-                
-                st.markdown("<h4 class='brand-font' style='color:#D81B60;'>📊 Indicadores Clave de Desempeño (KPIs)</h4>", unsafe_allow_html=True)
-                kpi1, kpi2, kpi3, kpi4 = st.columns(4)
-                
-                kpi1.metric("Ingresos Totales", f"${total_ingresos:,.2f} MXN")
-                kpi2.metric("Egresos Totales", f"${total_egresos:,.2f} MXN")
-                kpi3.metric("Ganancia Neta", f"${balance_neto:,.2f} MXN")
-                kpi4.metric("Ticket Promedio", f"${ticket_promedio:,.2f} MXN")
-                
-                st.write("---")
-                
-                col_tabla, col_grafica = st.columns([1.5, 1])
-                
-                with col_tabla:
-                    st.markdown("<h5 class='brand-font' style='color:#D81B60;'>📋 Historial de Transacciones</h5>", unsafe_allow_html=True)
-                    st.dataframe(df_mis_finanzas[["Fecha", "Cliente", "Concepto", "Monto", "Tipo"]], use_container_width=True)
-                    
-                    # ELIMINAR TRANSACCIONES ESPECÍFICAS
-                    with st.expander("🗑️ Eliminar Transacción del Historial"):
-                        opciones_t = [f"ID {idx_m}: {row_m['Fecha']} - {row_m['Concepto']} (${row_m['Monto']})" for idx_m, row_m in df_mis_finanzas.iterrows()]
-                        t_elim_sel = st.selectbox("Selecciona la transacción a borrar:", opciones_t)
-                        if st.button("❌ Confirmar Eliminación de Transacción"):
-                            idx_borrar = int(t_elim_sel.split(":")[0].replace("ID ", ""))
-                            df_finanzas = df_finanzas.drop(index=idx_borrar)
-                            guardar_datos(df_finanzas, ARCHIVO_FINANZAS)
-                            st.success("¡Transacción eliminada con éxito!")
-                            st.rerun()
-
-                with col_grafica:
-                    st.markdown("<h5 class='brand-font' style='color:#D81B60;'>📈 Balance Ingresos vs Egresos</h5>", unsafe_allow_html=True)
-                    resumen_df = pd.DataFrame({
-                        "Categoría": ["Ingresos", "Egresos"],
-                        "Monto": [total_ingresos, total_egresos]
-                    })
-                    st.bar_chart(resumen_df.set_index("Categoría"))
-
-        # --- SUBPESTAÑA 2: AGENDA DE CITAS Y EVENTOS ---
-        with subtab_agenda:
-            df_agenda = cargar_agenda()
-            df_mi_agenda = df_agenda.copy() if st.session_state["es_admin"] else df_agenda[df_agenda["Email_Emprendedora"] == email_actual].copy()
-            
-            with st.expander("➕ AGENDAR NUEVO EVENTO / CITA"):
-                with st.form("form_nueva_cita"):
-                    col_ag1, col_ag2 = st.columns(2)
-                    with col_ag1:
-                        fecha_ag = st.date_input("Fecha del Evento", value=date.today(), key="ag_fecha")
-                        hora_ag = st.time_input("Hora", key="ag_hora")
-                        evento_ag = st.text_input("Título / Motivo de la Cita", placeholder="Ej. Servicio Lash Lifting / Sesión de Fotos")
-                    with col_ag2:
-                        cliente_ag = st.text_input("Cliente / Contacto", placeholder="Ej. Sofía Gómez (5512345678)")
-                        notas_ag = st.text_area("Notas Adicionales", placeholder="Ej. Anticipo recibido / Traer material especial")
-                        
-                    btn_agendar = st.form_submit_button("🗓️ Guardar Cita en Agenda")
-                    
-                    if btn_agendar and evento_ag:
-                        nueva_cita = pd.DataFrame([{
-                            "Email_Emprendedora": email_actual,
-                            "Fecha": fecha_ag.strftime("%Y-%m-%d"),
-                            "Hora": hora_ag.strftime("%H:%M"),
-                            "Evento": evento_ag,
-                            "Cliente_Contacto": cliente_ag if cliente_ag else "N/A",
-                            "Notas": notas_ag if notas_ag else "Sin notas"
-                        }])
-                        df_agenda = pd.concat([df_agenda, nueva_cita], ignore_index=True)
-                        guardar_datos(df_agenda, ARCHIVO_AGENDA)
-                        st.success("¡Cita programada con éxito!")
-                        st.rerun()
-            st.write("---")
-            st.markdown("<h4 class='brand-font' style='color:#D81B60;'>📆 Mi Calendario de Citas y Compromisos</h4>", unsafe_allow_html=True)
-            
-            if df_mi_agenda.empty:
-                st.info("No tienes citas agendadas por el momento.")
-            else:
-                st.dataframe(df_mi_agenda[["Fecha", "Hora", "Evento", "Cliente_Contacto", "Notas"]].sort_values(by=["Fecha", "Hora"]), use_container_width=True)
-
-        # --- SUBPESTAÑA 3: LISTA DE PENDIENTES (TO-DO) ---
-        with subtab_tareas:
-            df_tareas = cargar_tareas()
-            df_mis_tareas = df_tareas.copy() if st.session_state["es_admin"] else df_tareas[df_tareas["Email_Emprendedora"] == email_actual].copy()
-            
-            with st.expander("➕ AÑADIR NUEVO PENDIENTE"):
-                with st.form("form_nueva_tarea"):
-                    tarea_txt = st.text_input("Descripción de la Tarea / Pendiente", placeholder="Ej. Comprar insumos de uñas / Hacer corte de caja")
-                    prio_txt = st.selectbox("Prioridad", ["Alta 🔥", "Media ⚡", "Baja ☕"])
-                    btn_crear_tarea = st.form_submit_button("📌 Agregar Pendiente")
-                    
-                    if btn_crear_tarea and tarea_txt:
-                        nueva_t = pd.DataFrame([{
-                            "Email_Emprendedora": email_actual,
-                            "Tarea": tarea_txt,
-                            "Prioridad": prio_txt,
-                            "Estatus": "Pendiente ⏳"
-                        }])
-                        df_tareas = pd.concat([df_tareas, nueva_t], ignore_index=True)
-                        guardar_datos(df_tareas, ARCHIVO_TAREAS)
-                        st.success("¡Pendiente agregado!")
-                        st.rerun()
-            st.write("---")
-            st.markdown("<h4 class='brand-font' style='color:#D81B60;'>📋 Lista Activa de Tareas</h4>", unsafe_allow_html=True)
-            
-            if df_mis_tareas.empty:
-                st.info("¡Felicidades! No tienes tareas pendientes.")
-            else:
-                for idx_t, row_t in df_mis_tareas.iterrows():
-                    c_t1, c_t2, c_t3 = st.columns([3, 1, 1])
-                    c_t1.write(f"• **{row_t['Tarea']}** ({row_t['Prioridad']})")
-                    c_t2.write(f"Estado: *{row_t['Estatus']}*")
-                    if c_t3.button("✔ Concluir", key=f"btn_done_{idx_t}"):
-                        df_tareas.loc[idx_t, "Estatus"] = "Completado ✅"
-                        guardar_datos(df_tareas, ARCHIVO_TAREAS)
-                        st.success("¡Tarea actualizada!")
-                        st.rerun()
-
-# --- PESTAÑA: EDUCACIÓN Y CAPACITACIÓN CON COMPRESIÓN DE VIDEO ---
-with tab_por_nombre["📚 Educación"]:
-    st.markdown("""
-        <div class="capacitacion-container">
-            <h3 class="brand-font" style="color:#D81B60; margin-top:0;">📚 Centro de Capacitación y Cursos Empoder-Arte</h3>
-            <p style="color:#444; font-size:14px;">Subes y gestiona las capacitaciones en video para la red. Los videos son optimizados y comprimidos automáticamente para reducir su tamaño de almacenamiento.</p>
-        </div>
-    """, unsafe_allow_html=True)
-    col_subida, col_gestion = st.columns([1.2, 1])
-    with col_subida:
-        st.markdown("<h4 class='brand-font' style='color:#D81B60;'>📹 Subir Nuevo Taller / Clase</h4>", unsafe_allow_html=True)
-        
-        with st.form("form_subir_capacitacion", clear_on_submit=True):
-            titulo_video = st.text_input("Título de la Capacitación")
-            descripcion_video = st.text_area("Descripción del Contenido")
-            categoria_video = st.selectbox("Categoría", ["Finanzas & Costos", "Estrategia Digital", "Desarrollo Personal", "Liderazgo & Fe"])
-            archivo_video = st.file_uploader("Selecciona el archivo de video (MP4, MOV, AVI)", type=["mp4", "mov", "avi"])
-            
-            btn_subir_v = st.form_submit_button("🚀 Subir y Comprimir Video")
-            if btn_subir_v and archivo_video and titulo_video:
-                os.makedirs("videos_capacitacion", exist_ok=True)
-                
-                ruta_original = os.path.join("videos_capacitacion", f"temp_{archivo_video.name}")
-                ruta_comprimida = os.path.join("videos_capacitacion", f"compressed_{archivo_video.name}")
-                
-                with open(ruta_original, "wb") as f:
-                    f.write(archivo_video.getbuffer())
-                
-                peso_original_mb = os.path.getsize(ruta_original) / (1024 * 1024)
-                st.info(f"📦 Tamaño original: {peso_original_mb:.2f} MB. Comprimiendo video...")
-                try:
-                    comando = [
-                        "ffmpeg", "-y", "-i", ruta_original,
-                        "-vcodec", "libx264", "-crf", "28",
-                        "-preset", "faster", "-acodec", "aac",
-                        ruta_comprimida
-                    ]
-                    subprocess.run(comando, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-                    
-                    peso_comprimido_mb = os.path.getsize(ruta_comprimida) / (1024 * 1024)
-                    st.success(f"✨ ¡Video optimizado con éxito! Nuevo tamaño: {peso_comprimido_mb:.2f} MB (Ahorro del {((peso_original_mb - peso_comprimido_mb)/peso_original_mb)*100:.1f}%)")
-                    
-                    if os.path.exists(ruta_original):
-                        os.remove(ruta_original)
-                        
-                except Exception:
-                    st.warning("⚠️ No se detectó ffmpeg instalado localmente. Se conservará el archivo original con resolución nativa.")
-                    os.rename(ruta_original, ruta_comprimida)
-                
-                st.rerun()
-    with col_gestion:
-        st.markdown("<h4 class='brand-font' style='color:#D81B60;'>🎓 Catálogo de Videocursos</h4>", unsafe_allow_html=True)
-        
-        carp_videos = "videos_capacitacion"
-        if os.path.exists(carp_videos):
-            lista_vids = [f for f in os.listdir(carp_videos) if f.startswith("compressed_")]
-            if not lista_vids:
-                st.info("Aún no hay videos registrados en la plataforma.")
-            else:
-                for v_item in lista_vids:
-                    st.markdown(f"""
-                        <div class="video-card">
-                            <b style="color:#D81B60; font-size:16px;">🎥 {v_item.replace('compressed_', '').replace('_', ' ')}</b>
-                            <p style="color:#666; font-size:12px; margin: 4px 0;">Estado: Disponible en Servidor Local</p>
-                        </div>
-                    """, unsafe_allow_html=True)
-                    st.video(os.path.join(carp_videos, v_item))
-        else:
-            st.info("Aún no hay videos registrados en la plataforma.")
-
-# --- PESTAÑA: ZONA VIP / EXCLUSIVO (segunda posición, siempre presente) ---
-with tab_por_nombre["👑 Zona VIP / Exclusivo"]:
+# --- (MOVIDO) El contenido de «Mi Oficina» y «Educación» ahora vive como sub-pestañas
+# dentro de la Zona Premium (estado de acceso vigente). Ver más abajo `sub_premium`.
+with tab_por_nombre["👑 Zona Premium / Exclusivo"]:
     # Resolver el usuario SQLite UNA sola vez y ramificar en 4 estados.
     if not st.session_state.get("sesion_activa"):
         # ESTADO A — Visitante sin sesión: invitar a iniciar sesión.
         st.markdown(
             "<div style='background:linear-gradient(135deg,#D81B60,#EF289A);padding:28px;"
             "border-radius:16px;text-align:center;color:white;'>"
-            "<h2 class='brand-font'>👑 Zona VIP / Exclusivo</h2>"
+            "<h2 class='brand-font'>👑 Zona Premium / Exclusivo</h2>"
             "<p>Inicia sesión en la barra lateral para acceder a tu contenido premium.</p>"
             "</div>",
             unsafe_allow_html=True,
@@ -2168,70 +1917,293 @@ with tab_por_nombre["👑 Zona VIP / Exclusivo"]:
             st.markdown(
                 "<div style='background:#FFF0F6;border:2px solid #EF289A;padding:24px;"
                 "border-radius:14px;color:#D81B60;'>"
-                "<h3 class='brand-font'>👑 Zona VIP / Exclusivo</h3>"
+                "<h3 class='brand-font'>👑 Zona Premium / Exclusivo</h3>"
                 "<p>Tu cuenta aún no está en el nuevo sistema de suscripciones. "
                 "Contacta a la fundadora para activarla.</p></div>",
                 unsafe_allow_html=True,
             )
         elif db.tiene_acceso_vip(usuario_sql["id"]):
-            # ESTADO C — acceso VIP vigente: centro de accesos premium (Lives, Mi Oficina, Educación).
+            # ESTADO C — acceso Premium vigente: centro de accesos premium (Lives, Mi Oficina, Educación).
             st.markdown(
                 "<div style='background:linear-gradient(135deg,#D81B60,#EF289A);padding:28px;"
                 "border-radius:16px;color:white;margin-bottom:18px;'>"
-                "<h2 class='brand-font'>👑 Bienvenida a tu Zona VIP ✨</h2>"
+                "<h2 class='brand-font'>👑 Bienvenida a tu Zona Premium ✨</h2>"
                 "<p style='margin:6px 0 0 0;'>Tu suscripción está activa. Desde aquí accedes a tus "
-                "tres beneficios exclusivos. Ábrelos en las pestañas de arriba.</p></div>",
+                "tres beneficios exclusivos en las siguientes pestañas.</p></div>",
                 unsafe_allow_html=True,
             )
+            st.success("✨ Tu suscripción Premium está activa. Ya tienes acceso a las tres secciones.")
 
-            # Nota: Streamlit no permite cambiar de pestaña con un botón de forma nativa,
-            # por eso cada tarjeta indica claramente en qué pestaña superior está la sección.
-            st.markdown(
-                """
-                <style>
-                .vip-card {background:#FFFFFF;border:2px solid #F8BBD0;border-left:6px solid #EF289A;
-                           border-radius:16px;padding:20px 22px;margin-bottom:16px;
-                           box-shadow:0 4px 14px rgba(216,27,96,0.12);}
-                .vip-card h3 {color:#D81B60;margin:0 0 6px 0;}
-                .vip-card p {color:#555;margin:0 0 8px 0;font-size:14px;}
-                .vip-pill {display:inline-block;background:#FFF0F5;color:#D81B60;font-weight:bold;
-                           font-size:13px;padding:6px 14px;border-radius:20px;border:1px dashed #EF289A;}
-                </style>
+            # Sub-pestañas internas de la Zona Premium: Transmisión (remite arriba),
+            # Mi Oficina y Educación (contenido movido aquí dentro).
+            sub_premium = st.tabs(["🔴 Transmisión En Vivo", "💼 Mi Oficina", "📚 Educación"])
 
-                <div class="vip-card">
-                    <h3 class="brand-font">🔴 Transmisiones en Vivo</h3>
-                    <p>Inicia tus propios lives para la comunidad y revive tus grabaciones recientes.</p>
-                    <span class="vip-pill">👉 Abre la pestaña «🔴 Transmisión En Vivo» arriba</span>
-                </div>
+            with sub_premium[0]:
+                # Las transmisiones viven en la pestaña superior para no duplicar el panel de lives.
+                st.info("🔴 El panel de transmisiones en vivo está en la pestaña «🔴 Transmisión En Vivo» de arriba.")
 
-                <div class="vip-card">
-                    <h3 class="brand-font">💼 Mi Oficina</h3>
-                    <p>Tu panel completo: métricas financieras, ventas, agenda de citas y tareas pendientes.</p>
-                    <span class="vip-pill">👉 Abre la pestaña «💼 Mi Oficina» arriba</span>
-                </div>
+            with sub_premium[1]:
+                # --- MI OFICINA (MÉTRICAS, AGENDA, TAREAS Y ELIMINACIÓN DE TRANSACCIONES) ---
+                st.markdown('<h3 class="brand-font" style="color:#D81B60;">💼 Mi Oficina | Empoder-Arte</h3>', unsafe_allow_html=True)
 
-                <div class="vip-card">
-                    <h3 class="brand-font">📚 Educación y Capacitación</h3>
-                    <p>Cursos, talleres y material de formación exclusivo para emprendedoras VIP.</p>
-                    <span class="vip-pill">👉 Abre la pestaña «📚 Educación» arriba</span>
-                </div>
-                """,
-                unsafe_allow_html=True,
-            )
-            st.success("✨ Tu suscripción VIP está activa. Ya tienes acceso a las tres secciones.")
+                es_vip = st.session_state["sesion_activa"] and (
+                    st.session_state["rol_usuario"] in ["VIP", "Admin", "Administradora"] or
+                    st.session_state["email_logueado"] == CORREO_ADMIN
+                )
+
+                if not es_vip:
+                    st.warning("🔒 Esta sección contiene herramientas avanzadas de gestión, inventario, métricas financieras, agenda y pendientes exclusivas para **Emprendedoras Premium**.")
+                    st.info("Actualiza tu cuenta a Premium ($99 MXN/mes) para habilitar tu panel administrativo completo.")
+                else:
+                    st.markdown("<p style='color:#555;'>Bienvenida a tu centro de control integral. Gestiona tus finanzas, coordina tus citas de negocio y organiza tus actividades pendientes.</p>", unsafe_allow_html=True)
+
+                    subtab_finanzas, subtab_agenda, subtab_tareas = st.tabs([
+                        "📊 Métricas Financieras y Ventas",
+                        "📅 Agenda de Citas y Cursos",
+                        "✅ Lista de Pendientes (To-Do)"
+                    ])
+
+                    email_actual = st.session_state["email_logueado"]
+
+                    # --- SUBPESTAÑA 1: FINANZAS, MÉTRICAS Y ELIMINACIÓN DE TRANSACCIONES ---
+                    with subtab_finanzas:
+                        df_finanzas = cargar_finanzas()
+                        df_mis_finanzas = df_finanzas.copy() if st.session_state["es_admin"] else df_finanzas[df_finanzas["Email_Emprendedora"] == email_actual].copy()
+
+                        with st.expander("➕ REGISTRAR NUEVA TRANSACCIÓN (VENTA / GASTO)"):
+                            with st.form("form_registro_finanzas"):
+                                col_f1, col_f2 = st.columns(2)
+                                with col_f1:
+                                    fecha_t = st.date_input("Fecha", value=date.today(), key="fin_fecha")
+                                    cliente_t = st.text_input("Cliente / Proveedor", placeholder="Ej. María López")
+                                    tipo_t = st.selectbox("Tipo de Transacción", ["Ingreso (Venta)", "Egreso (Gasto)"])
+                                with col_f2:
+                                    concepto_t = st.text_input("Concepto / Producto", placeholder="Ej. Servicio de Barbería / Insumos")
+                                    monto_t = st.number_input("Monto ($ MXN)", min_value=1.0, value=150.0, step=10.0)
+
+                                btn_guardar_t = st.form_submit_button("💾 Registrar Transacción")
+
+                                if btn_guardar_t and concepto_t:
+                                    nueva_t = pd.DataFrame([{
+                                        "Fecha": fecha_t.strftime("%Y-%m-%d"),
+                                        "Email_Emprendedora": email_actual,
+                                        "Cliente": cliente_t if cliente_t else "General",
+                                        "Concepto": concepto_t,
+                                        "Monto": float(monto_t),
+                                        "Tipo": tipo_t
+                                    }])
+                                    df_finanzas = pd.concat([df_finanzas, nueva_t], ignore_index=True)
+                                    guardar_datos(df_finanzas, ARCHIVO_FINANZAS)
+                                    st.success("¡Transacción registrada exitosamente!")
+                                    st.rerun()
+                        st.write("---")
+
+                        if df_mis_finanzas.empty:
+                            st.info("Aún no tienes transacciones registradas. Utiliza el formulario superior para añadir tu primera venta.")
+                        else:
+                            df_ingresos = df_mis_finanzas[df_mis_finanzas["Tipo"] == "Ingreso (Venta)"]
+                            df_egresos = df_mis_finanzas[df_mis_finanzas["Tipo"] == "Egreso (Gasto)"]
+
+                            total_ingresos = df_ingresos["Monto"].sum() if not df_ingresos.empty else 0.0
+                            total_egresos = df_egresos["Monto"].sum() if not df_egresos.empty else 0.0
+                            balance_neto = total_ingresos - total_egresos
+                            num_ventas = len(df_ingresos)
+                            ticket_promedio = total_ingresos / num_ventas if num_ventas > 0 else 0.0
+
+                            st.markdown("<h4 class='brand-font' style='color:#D81B60;'>📊 Indicadores Clave de Desempeño (KPIs)</h4>", unsafe_allow_html=True)
+                            kpi1, kpi2, kpi3, kpi4 = st.columns(4)
+
+                            kpi1.metric("Ingresos Totales", f"${total_ingresos:,.2f} MXN")
+                            kpi2.metric("Egresos Totales", f"${total_egresos:,.2f} MXN")
+                            kpi3.metric("Ganancia Neta", f"${balance_neto:,.2f} MXN")
+                            kpi4.metric("Ticket Promedio", f"${ticket_promedio:,.2f} MXN")
+
+                            st.write("---")
+
+                            col_tabla, col_grafica = st.columns([1.5, 1])
+
+                            with col_tabla:
+                                st.markdown("<h5 class='brand-font' style='color:#D81B60;'>📋 Historial de Transacciones</h5>", unsafe_allow_html=True)
+                                st.dataframe(df_mis_finanzas[["Fecha", "Cliente", "Concepto", "Monto", "Tipo"]], use_container_width=True)
+
+                                # ELIMINAR TRANSACCIONES ESPECÍFICAS
+                                with st.expander("🗑️ Eliminar Transacción del Historial"):
+                                    opciones_t = [f"ID {idx_m}: {row_m['Fecha']} - {row_m['Concepto']} (${row_m['Monto']})" for idx_m, row_m in df_mis_finanzas.iterrows()]
+                                    t_elim_sel = st.selectbox("Selecciona la transacción a borrar:", opciones_t)
+                                    if st.button("❌ Confirmar Eliminación de Transacción"):
+                                        idx_borrar = int(t_elim_sel.split(":")[0].replace("ID ", ""))
+                                        df_finanzas = df_finanzas.drop(index=idx_borrar)
+                                        guardar_datos(df_finanzas, ARCHIVO_FINANZAS)
+                                        st.success("¡Transacción eliminada con éxito!")
+                                        st.rerun()
+
+                            with col_grafica:
+                                st.markdown("<h5 class='brand-font' style='color:#D81B60;'>📈 Balance Ingresos vs Egresos</h5>", unsafe_allow_html=True)
+                                resumen_df = pd.DataFrame({
+                                    "Categoría": ["Ingresos", "Egresos"],
+                                    "Monto": [total_ingresos, total_egresos]
+                                })
+                                st.bar_chart(resumen_df.set_index("Categoría"))
+
+                    # --- SUBPESTAÑA 2: AGENDA DE CITAS Y EVENTOS ---
+                    with subtab_agenda:
+                        df_agenda = cargar_agenda()
+                        df_mi_agenda = df_agenda.copy() if st.session_state["es_admin"] else df_agenda[df_agenda["Email_Emprendedora"] == email_actual].copy()
+
+                        with st.expander("➕ AGENDAR NUEVO EVENTO / CITA"):
+                            with st.form("form_nueva_cita"):
+                                col_ag1, col_ag2 = st.columns(2)
+                                with col_ag1:
+                                    fecha_ag = st.date_input("Fecha del Evento", value=date.today(), key="ag_fecha")
+                                    hora_ag = st.time_input("Hora", key="ag_hora")
+                                    evento_ag = st.text_input("Título / Motivo de la Cita", placeholder="Ej. Servicio Lash Lifting / Sesión de Fotos")
+                                with col_ag2:
+                                    cliente_ag = st.text_input("Cliente / Contacto", placeholder="Ej. Sofía Gómez (5512345678)")
+                                    notas_ag = st.text_area("Notas Adicionales", placeholder="Ej. Anticipo recibido / Traer material especial")
+
+                                btn_agendar = st.form_submit_button("🗓️ Guardar Cita en Agenda")
+
+                                if btn_agendar and evento_ag:
+                                    nueva_cita = pd.DataFrame([{
+                                        "Email_Emprendedora": email_actual,
+                                        "Fecha": fecha_ag.strftime("%Y-%m-%d"),
+                                        "Hora": hora_ag.strftime("%H:%M"),
+                                        "Evento": evento_ag,
+                                        "Cliente_Contacto": cliente_ag if cliente_ag else "N/A",
+                                        "Notas": notas_ag if notas_ag else "Sin notas"
+                                    }])
+                                    df_agenda = pd.concat([df_agenda, nueva_cita], ignore_index=True)
+                                    guardar_datos(df_agenda, ARCHIVO_AGENDA)
+                                    st.success("¡Cita programada con éxito!")
+                                    st.rerun()
+                        st.write("---")
+                        st.markdown("<h4 class='brand-font' style='color:#D81B60;'>📆 Mi Calendario de Citas y Compromisos</h4>", unsafe_allow_html=True)
+
+                        if df_mi_agenda.empty:
+                            st.info("No tienes citas agendadas por el momento.")
+                        else:
+                            st.dataframe(df_mi_agenda[["Fecha", "Hora", "Evento", "Cliente_Contacto", "Notas"]].sort_values(by=["Fecha", "Hora"]), use_container_width=True)
+
+                    # --- SUBPESTAÑA 3: LISTA DE PENDIENTES (TO-DO) ---
+                    with subtab_tareas:
+                        df_tareas = cargar_tareas()
+                        df_mis_tareas = df_tareas.copy() if st.session_state["es_admin"] else df_tareas[df_tareas["Email_Emprendedora"] == email_actual].copy()
+
+                        with st.expander("➕ AÑADIR NUEVO PENDIENTE"):
+                            with st.form("form_nueva_tarea"):
+                                tarea_txt = st.text_input("Descripción de la Tarea / Pendiente", placeholder="Ej. Comprar insumos de uñas / Hacer corte de caja")
+                                prio_txt = st.selectbox("Prioridad", ["Alta 🔥", "Media ⚡", "Baja ☕"])
+                                btn_crear_tarea = st.form_submit_button("📌 Agregar Pendiente")
+
+                                if btn_crear_tarea and tarea_txt:
+                                    nueva_t = pd.DataFrame([{
+                                        "Email_Emprendedora": email_actual,
+                                        "Tarea": tarea_txt,
+                                        "Prioridad": prio_txt,
+                                        "Estatus": "Pendiente ⏳"
+                                    }])
+                                    df_tareas = pd.concat([df_tareas, nueva_t], ignore_index=True)
+                                    guardar_datos(df_tareas, ARCHIVO_TAREAS)
+                                    st.success("¡Pendiente agregado!")
+                                    st.rerun()
+                        st.write("---")
+                        st.markdown("<h4 class='brand-font' style='color:#D81B60;'>📋 Lista Activa de Tareas</h4>", unsafe_allow_html=True)
+
+                        if df_mis_tareas.empty:
+                            st.info("¡Felicidades! No tienes tareas pendientes.")
+                        else:
+                            for idx_t, row_t in df_mis_tareas.iterrows():
+                                c_t1, c_t2, c_t3 = st.columns([3, 1, 1])
+                                c_t1.write(f"• **{row_t['Tarea']}** ({row_t['Prioridad']})")
+                                c_t2.write(f"Estado: *{row_t['Estatus']}*")
+                                if c_t3.button("✔ Concluir", key=f"btn_done_{idx_t}"):
+                                    df_tareas.loc[idx_t, "Estatus"] = "Completado ✅"
+                                    guardar_datos(df_tareas, ARCHIVO_TAREAS)
+                                    st.success("¡Tarea actualizada!")
+                                    st.rerun()
+
+            with sub_premium[2]:
+                # --- EDUCACIÓN Y CAPACITACIÓN CON COMPRESIÓN DE VIDEO ---
+                st.markdown("""
+                    <div class="capacitacion-container">
+                        <h3 class="brand-font" style="color:#D81B60; margin-top:0;">📚 Centro de Capacitación y Cursos Empoder-Arte</h3>
+                        <p style="color:#444; font-size:14px;">Subes y gestiona las capacitaciones en video para la red. Los videos son optimizados y comprimidos automáticamente para reducir su tamaño de almacenamiento.</p>
+                    </div>
+                """, unsafe_allow_html=True)
+                col_subida, col_gestion = st.columns([1.2, 1])
+                with col_subida:
+                    st.markdown("<h4 class='brand-font' style='color:#D81B60;'>📹 Subir Nuevo Taller / Clase</h4>", unsafe_allow_html=True)
+
+                    with st.form("form_subir_capacitacion", clear_on_submit=True):
+                        titulo_video = st.text_input("Título de la Capacitación")
+                        descripcion_video = st.text_area("Descripción del Contenido")
+                        categoria_video = st.selectbox("Categoría", ["Finanzas & Costos", "Estrategia Digital", "Desarrollo Personal", "Liderazgo & Fe"])
+                        archivo_video = st.file_uploader("Selecciona el archivo de video (MP4, MOV, AVI)", type=["mp4", "mov", "avi"])
+
+                        btn_subir_v = st.form_submit_button("🚀 Subir y Comprimir Video")
+                        if btn_subir_v and archivo_video and titulo_video:
+                            os.makedirs("videos_capacitacion", exist_ok=True)
+
+                            ruta_original = os.path.join("videos_capacitacion", f"temp_{archivo_video.name}")
+                            ruta_comprimida = os.path.join("videos_capacitacion", f"compressed_{archivo_video.name}")
+
+                            with open(ruta_original, "wb") as f:
+                                f.write(archivo_video.getbuffer())
+
+                            peso_original_mb = os.path.getsize(ruta_original) / (1024 * 1024)
+                            st.info(f"📦 Tamaño original: {peso_original_mb:.2f} MB. Comprimiendo video...")
+                            try:
+                                comando = [
+                                    "ffmpeg", "-y", "-i", ruta_original,
+                                    "-vcodec", "libx264", "-crf", "28",
+                                    "-preset", "faster", "-acodec", "aac",
+                                    ruta_comprimida
+                                ]
+                                subprocess.run(comando, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+
+                                peso_comprimido_mb = os.path.getsize(ruta_comprimida) / (1024 * 1024)
+                                st.success(f"✨ ¡Video optimizado con éxito! Nuevo tamaño: {peso_comprimido_mb:.2f} MB (Ahorro del {((peso_original_mb - peso_comprimido_mb)/peso_original_mb)*100:.1f}%)")
+
+                                if os.path.exists(ruta_original):
+                                    os.remove(ruta_original)
+
+                            except Exception:
+                                st.warning("⚠️ No se detectó ffmpeg instalado localmente. Se conservará el archivo original con resolución nativa.")
+                                os.rename(ruta_original, ruta_comprimida)
+
+                            st.rerun()
+                with col_gestion:
+                    st.markdown("<h4 class='brand-font' style='color:#D81B60;'>🎓 Catálogo de Videocursos</h4>", unsafe_allow_html=True)
+
+                    carp_videos = "videos_capacitacion"
+                    if os.path.exists(carp_videos):
+                        lista_vids = [f for f in os.listdir(carp_videos) if f.startswith("compressed_")]
+                        if not lista_vids:
+                            st.info("Aún no hay videos registrados en la plataforma.")
+                        else:
+                            for v_item in lista_vids:
+                                st.markdown(f"""
+                                    <div class="video-card">
+                                        <b style="color:#D81B60; font-size:16px;">🎥 {v_item.replace('compressed_', '').replace('_', ' ')}</b>
+                                        <p style="color:#666; font-size:12px; margin: 4px 0;">Estado: Disponible en Servidor Local</p>
+                                    </div>
+                                """, unsafe_allow_html=True)
+                                st.video(os.path.join(carp_videos, v_item))
+                    else:
+                        st.info("Aún no hay videos registrados en la plataforma.")
         else:
             # ESTADO D — existe pero sin acceso (inactivo/pendiente/vencido).
             st.markdown(
                 "<div style='background:#FFF0F6;border:2px solid #D81B60;padding:24px;"
                 "border-radius:14px;color:#D81B60;text-align:center;'>"
-                "<h3 class='brand-font'>⚠️ Tu suscripción VIP ha caducado o está inactiva</h3>"
+                "<h3 class='brand-font'>⚠️ Tu suscripción Premium ha caducado o está inactiva</h3>"
                 "<p>Renueva tu membresía para recuperar el acceso premium.</p></div>",
                 unsafe_allow_html=True,
             )
-            st.markdown("### 💳 Renovar / Activar VIP")
-            if st.button("💳 Simular pago y activar VIP", key="btn_pago_vip_zona"):
+            st.markdown("### 💳 Renovar / Activar Premium")
+            if st.button("💳 Simular pago y activar Premium", key="btn_pago_vip_zona"):
                 db.activar_suscripcion_vip(usuario_sql["id"])
-                st.success("¡Pago simulado! Tu suscripción VIP quedó activa.")
+                st.success("¡Pago simulado! Tu suscripción Premium quedó activa.")
                 st.rerun()
 
 # --- PESTAÑA: DASHBOARD ADMIN & GESTIÓN TOTAL DE USUARIOS ---
@@ -2244,7 +2216,7 @@ if "📊 Dashboard Admin" in tab_por_nombre:
         t_admin_ver, t_admin_ctrl, t_admin_new, t_admin_reset, t_admin_del, t_admin_subs, t_admin_pub = st.tabs([
             "🔍 Verificación & Cifrado (CURP/INE)",
             "⚙️ Control de Roles y Bajas",
-            "➕ Registrar Usuario VIP / Admin",
+            "➕ Registrar Usuaria Premium / Admin",
             "🔑 Reseteo de Contraseñas",
             "🔥 Eliminación Definitiva",
             "💳 Gestión de Suscripciones",
@@ -2309,7 +2281,7 @@ if "📊 Dashboard Admin" in tab_por_nombre:
 
         # SUBPESTAÑA 3: ALTA MANUAL DE USUARIOS VIP / ADMIN
         with t_admin_new:
-            st.markdown("<h4 class='brand-font' style='color:#D81B60;'>➕ Alta Manual de Usuario VIP o Administrador</h4>", unsafe_allow_html=True)
+            st.markdown("<h4 class='brand-font' style='color:#D81B60;'>➕ Alta Manual de Usuaria Premium o Administrador</h4>", unsafe_allow_html=True)
             with st.form("form_alta_manual_admin"):
                 n_nom = st.text_input("Nombre Completo:")
                 n_email = st.text_input("Correo Electrónico:").strip().lower()
@@ -2388,12 +2360,12 @@ if "📊 Dashboard Admin" in tab_por_nombre:
                     else:
                         st.warning("No se pudo actualizar el estado (sin suscripción o estado inválido).")
 
-                if st.button("👑 Activar VIP directo", key="btn_vip_directo_subs"):
+                if st.button("👑 Activar Premium directo", key="btn_vip_directo_subs"):
                     if db.activar_suscripcion_vip(usuario_id_sel):
-                        st.success("Suscripción VIP activada.")
+                        st.success("Suscripción Premium activada.")
                         st.rerun()
                     else:
-                        st.warning("No se pudo activar el VIP.")
+                        st.warning("No se pudo activar el Premium.")
 
         # SUBPESTAÑA 7: PUBLICIDAD / BANNERS (gestión de anuncios de la portada)
         with t_admin_pub:
